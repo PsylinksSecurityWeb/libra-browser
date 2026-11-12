@@ -1,0 +1,168 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+
+  <PropertyGroup Label="Globals">
+    <VCProjectVersion>17.0</VCProjectVersion>
+    <ProjectGuid>{B4C2F1A3-9E6D-4F28-B13A-7D82C5E14F91}</ProjectGuid>
+    <RootNamespace>LibraBrowser</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+    <Platform>x64</Platform>
+    <Keyword>Win32Proj</Keyword>
+    <ProjectName>LibraBrowser</ProjectName>
+    <WebView2LoaderPreference>Static</WebView2LoaderPreference>
+  </PropertyGroup>
+
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props"/>
+
+  <!-- ─── Release ─────────────────────────────────────────────────────────── -->
+  <PropertyGroup Condition="'$(Configuration)'=='Release'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v145</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <SpectreMitigation>false</SpectreMitigation>
+  </PropertyGroup>
+
+  <!-- ─── Debug ───────────────────────────────────────────────────────────── -->
+  <PropertyGroup Condition="'$(Configuration)'=='Debug'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v145</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props"/>
+  <ImportGroup Label="ExtensionSettings"/>
+  <ImportGroup Label="Shared"/>
+
+  <!-- ─── NuGet WebView2 props ─────────────────────────────────────────────── -->
+  <ImportGroup Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props"
+            Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform"/>
+  </ImportGroup>
+
+  <!-- ─── Release Compile/Link Settings ──────────────────────────────────── -->
+  <ItemDefinitionGroup Condition="'$(Configuration)'=='Release'">
+    <ClCompile>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>MinSpace</Optimization>
+      <FavorSizeOrSpeed>Size</FavorSizeOrSpeed>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <WholeProgramOptimization>true</WholeProgramOptimization>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_WINDOWS;UNICODE;_UNICODE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
+      <ScanSourceForModuleDependencies>false</ScanSourceForModuleDependencies>
+      <BuildStlModules>false</BuildStlModules>
+      <SDLCheck>true</SDLCheck>
+      <ControlFlowGuard>Guard</ControlFlowGuard>
+      <MinimalRebuild>false</MinimalRebuild>
+      <StringPooling>true</StringPooling>
+      <OmitFramePointers>true</OmitFramePointers>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <LinkTimeCodeGeneration>UseLinkTimeCodeGeneration</LinkTimeCodeGeneration>
+      <GenerateDebugInformation>false</GenerateDebugInformation>
+      <AdditionalDependencies>
+        WebView2LoaderStatic.lib;comctl32.lib;dwmapi.lib;shlwapi.lib;uxtheme.lib;
+        Ole32.lib;OleAut32.lib;bcrypt.lib;windowsapp.lib;%(AdditionalDependencies)
+      </AdditionalDependencies>
+      <AdditionalOptions>/CETCOMPAT /DYNAMICBASE /HIGHENTROPYVA /NXCOMPAT %(AdditionalOptions)</AdditionalOptions>
+      <TargetMachine>MachineX64</TargetMachine>
+    </Link>
+    <Manifest>
+      <EmbedManifest>true</EmbedManifest>
+    </Manifest>
+  </ItemDefinitionGroup>
+
+  <!-- ─── Debug Compile/Link Settings ────────────────────────────────────── -->
+  <ItemDefinitionGroup Condition="'$(Configuration)'=='Debug'">
+    <ClCompile>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>Disabled</Optimization>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_WINDOWS;UNICODE;_UNICODE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
+      <ScanSourceForModuleDependencies>false</ScanSourceForModuleDependencies>
+      <BuildStlModules>false</BuildStlModules>
+      <SDLCheck>false</SDLCheck>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>
+        WebView2LoaderStatic.lib;comctl32.lib;dwmapi.lib;shlwapi.lib;uxtheme.lib;
+        Ole32.lib;OleAut32.lib;bcrypt.lib;windowsapp.lib;%(AdditionalDependencies)
+      </AdditionalDependencies>
+      <TargetMachine>MachineX64</TargetMachine>
+    </Link>
+  </ItemDefinitionGroup>
+
+  <!-- ─── Source Files ────────────────────────────────────────────────────── -->
+  <ItemGroup>
+    <ClCompile Include="src\pch.cpp">
+      <PrecompiledHeader>Create</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="src\main.cpp"/>
+    <ClCompile Include="src\BrowserWindow.cpp"/>
+    <ClCompile Include="src\AdBlocker.cpp"/>
+    <ClCompile Include="src\SafetyAuth.cpp"><PrecompiledHeader>NotUsing</PrecompiledHeader></ClCompile>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ClInclude Include="src\pch.h"/>
+    <ClInclude Include="src\resource.h"/>
+    <ClInclude Include="src\Theme.h"/>
+    <ClInclude Include="src\Tab.h"/>
+    <ClInclude Include="src\AdBlocker.h"/>
+    <ClInclude Include="src\BrowserWindow.h"/>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ResourceCompile Include="src\LibraBrowser.rc"/>
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="packages.config"/>
+  </ItemGroup>
+
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets"/>
+  <ImportGroup Label="ExtensionTargets">
+    <!-- NuGet WebView2 targets — resolved after nuget restore -->
+    <Import Project="packages\Microsoft.Web.WebView2.1.0.4314.35\build\native\Microsoft.Web.WebView2.targets"
+            Condition="Exists('packages\Microsoft.Web.WebView2.1.0.4314.35\build\native\Microsoft.Web.WebView2.targets')"/>
+    <Import Project="packages\Microsoft.Windows.ImplementationLibrary.1.0.240803.1\build\native\Microsoft.Windows.ImplementationLibrary.targets"
+            Condition="Exists('packages\Microsoft.Windows.ImplementationLibrary.1.0.240803.1\build\native\Microsoft.Windows.ImplementationLibrary.targets')"/>
+  </ImportGroup>
+
+  <!-- Warn if packages not restored yet -->
+  <Target Name="EnsureNuGetPackageImportsExist">
+    <Error Condition="!Exists('packages\Microsoft.Web.WebView2.1.0.4314.35\build\native\Microsoft.Web.WebView2.targets')"
+           Text="WebView2 NuGet package not found. Run: nuget restore LibraBrowser.vcxproj -PackagesDirectory packages"/>
+    <Error Condition="!Exists('packages\Microsoft.Windows.ImplementationLibrary.1.0.240803.1\build\native\Microsoft.Windows.ImplementationLibrary.targets')"
+           Text="WIL NuGet package not found. Run: nuget restore LibraBrowser.vcxproj -PackagesDirectory packages"/>
+  </Target>
+
+</Project>

@@ -1,0 +1,18 @@
+Libra Browser Source-Available License, version 1.0
+Copyright (c) Psylinks Security Private Limited, India. All rights reserved.
+
+You may: read, study and audit this source code, and run the unmodified
+official builds of Libra Browser for your own personal use.
+
+You may NOT, without prior written permission from Psylinks Security Private Limited:
+  1. modify, translate or create derivative works of the code or the app;
+  2. copy, publish, share or distribute the code or builds, in whole or in part;
+  3. sell, license, rent or offer the software or any derivative commercially;
+  4. remove or change names, notices or branding.
+
+Contributions or security reports are welcome; by sending them you allow
+Psylinks Security Private Limited to use them. This software is provided "as is", without
+warranty of any kind. Psylinks Security Private Limited is not liable for any damage from its use.
+
+Note: this license makes the code visible ("source available"). It is not an
+OSI-approved open-source license.

@@ -1,0 +1,19 @@
+# build output and local data
+x64/
+Debug/
+Release/
+packages/
+*.user
+*.obj
+*.pdb
+# private / internal working files (not for the public repo)
+backup*/
+graphify-out/
+CLAUDE.md
+assets/*.mp4
+assets/*.webm
+assets/gen.py
+assets/patch*.py
+*.bak
+*.herobak
+settings.ini*

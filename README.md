@@ -35,8 +35,17 @@ The checksum, filename, release tag, and source repository together provide a pr
 - **Security defaults that matter:** popups need a real click, downloads started by a page without a click are refused, permissions default to *ask*, motion sensors are always blocked, https upgrade, fingerprint protection, Mark-of-the-Web on downloads.
 - **Clean, flat, calm UI.** White canvas, no shadows, no clutter, no promotions.
 
-## Screenshot
-![Settings](docs/screenshots/settings.png)
+## Screenshots
+
+A quick look at Libra's calm, lightweight interface, private search setup, everyday browsing, and live protection report.
+
+| Welcome | Choose your search | New-tab page |
+|---|---|---|
+| ![Libra Browser welcome screen](docs/screenshots/welcome.png) | ![Libra Browser search-engine selection](docs/screenshots/search-engines.png) | ![Libra Browser new-tab page](docs/screenshots/new-tab.png) |
+
+| Everyday browsing | Privacy report | Settings |
+|---|---|---|
+| ![Libra Browser browsing view](docs/screenshots/browsing.png) | ![Libra Browser privacy report](docs/screenshots/privacy-report.png) | ![Libra Browser settings](docs/screenshots/settings.png) |
 
 ## Features
 **Protection**

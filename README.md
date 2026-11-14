@@ -7,7 +7,7 @@ No account. No sync. No telemetry in Libra's own code. Built by <b>Psylinks Secu
 
 <p align="center"><a href="https://github.com/PsylinksSecurityWeb/libra-browser/releases/tag/v3.2.0-beta">Download Libra Browser 3.2.0 beta</a> · <a href="https://github.com/PsylinksSecurityWeb/libra-browser">Source code</a> · <a href="https://github.com/PsylinksSecurityWeb/libra-browser/issues">Issues</a> · <a href="https://github.com/PsylinksSecurityWeb/libra-browser/security/advisories/new">Report a vulnerability</a></p>
 
-> **License:** source available, not open source. You may read and audit the code; you may not modify, share or sell it without written permission. See [LICENSE](LICENSE).
+> **License:** open source under the [Apache License 2.0](LICENSE). You may use, modify, distribute, sublicense, and sell the code, provided you preserve the required copyright, license, patent, trademark, and attribution notices. See [NOTICE](NOTICE).
 
 ## Official download: Libra Browser 3.2.0 beta for Windows
 
@@ -26,6 +26,8 @@ d8639238cb886580af2b31042564aee6bfb8e880c8abe4de29b648f8e1f1e5a3
 ```
 
 The checksum, filename, release tag, and source repository together provide a practical way to confirm that you have the intended official beta installer rather than a renamed or modified copy.
+
+> **License history:** The `v3.2.0-beta` release was published before this license change. The Apache-2.0 license applies to the updated source on `main`; see the release materials for the terms that accompanied that beta.
 
 ## Why Libra
 - **Blocks ads and trackers at the DNS layer.** Every site name is looked up through our own DNS-over-HTTPS server, so trackers are refused *before* a connection exists. Less data, less CPU, faster pages.
@@ -136,7 +138,7 @@ Or open `LibraBrowser/LibraBrowser.vcxproj` and build **Release | x64**. Output:
 Settings groups and search, sensor and permission notices, offline spelling help, offline voice search, upstream proxy support for VPN and proxy users, code signing.
 
 ## FAQ
-**Is it open source?** It is *source available*. The code is public to read, but modifying, redistributing or selling it needs written permission.
+**Is it open source?** Yes. The code on `main` is licensed under Apache-2.0. You may modify, redistribute, sublicense, and sell it, but distributed copies and derivative works must preserve the Apache-2.0 license and the attribution in [NOTICE](NOTICE). The Libra name and trademarks remain protected.
 
 **Why not an extension like uBlock Origin?** Libra blocks one level lower (DNS), needs no extension and uses less memory. Libra has no extension system by design.
 

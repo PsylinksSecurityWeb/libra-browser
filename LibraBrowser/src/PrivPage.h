@@ -23,10 +23,11 @@ inline std::wstring PrivacyPage(bool grey, bool isDefault) {
 .pulse{animation:pop .5s}@keyframes pop{40%{transform:scale(1.04)}}
 </style>
 <h1>Privacy</h1>
-<div class=go><button class=pri id=go>Clear selected</button><div class=rg id=rg><button data-r=hour>Last hour</button><button data-r=day>24 hours</button><button data-r=week>7 days</button><button class=on data-r=all>All time</button></div><span id=msg></span></div>
+<div class=go><button class=pri id=go>Clear selected</button><div class=rg id=rg><button data-r=hour>Last hour</button><button data-r=day>24 hours</button><button data-r=week>7 days</button><button data-r=month>4 weeks</button><button class=on data-r=all>All time</button></div><a href="#" id=sa style="font-size:13px;color:#111">Select all / none</a><span id=msg></span></div>
 <div class=card style="padding:0"><div class=hero><div><div class=big id=trk>0</div><div style="color:var(--mute);margin-top:6px">ads and trackers blocked</div></div>
-<div class=mini><div><b id=blk>0</b><small>blocked servers</small></div><div><b id=cdom>0</b><small>sites with cookies</small></div><div><b id=tot>0 B</b><small>stored on disk</small></div></div></div>
+<div class=mini><div><b id=blk>0</b><small>blocked servers</small></div><div><b id=vl>0</b><small>answered on this PC</small></div><div><b id=cdom>0</b><small>sites with cookies</small></div><div><b id=tot>0 B</b><small>stored on disk</small></div></div></div>
 <div class=stack><i id=s1 style="background:#111"></i><i id=s2 style="background:#7c5cff"></i><i id=s3 style="background:#38bdf8"></i></div></div>
+<p style="color:var(--mute);font-size:12.5px;margin:14px 2px 0;line-height:1.5">Sites cannot see your device name, model or system build, and your browser identity changes every day. Your IP address is still visible to the sites you visit; only a VPN or Tor can hide it.</p>
 <h2>Protection report</h2>
 <div class=card><div class=lg><span><i style="background:#E5484D"></i>Ads</span><span><i style="background:#F5A524"></i>Trackers</span><span><i style="background:#3E7BFA"></i>Analytics</span><span><i style="background:#8E4EC6"></i>Social</span><small>types are estimated from server names</small></div>
 <div class=bars id=bars></div><h3 style="margin:22px 0 6px;font-size:14px">Top blocked servers <small style="color:var(--mute);font-weight:400">last 90 days</small></h3><div id=top></div></div>
@@ -39,29 +40,32 @@ inline std::wstring PrivacyPage(bool grey, bool isDefault) {
         { L"site",  L"Site data",              L"Local storage, databases, offline workers",           L"rgba(124,92,255,.18)" },
         { L"cache", L"Cache",                  L"Saved images and scripts",                            L"rgba(56,189,248,.22)" },
         { L"dns",   L"Lookup memory",             L"Names of the sites Libra looked up",                  L"rgba(17,17,17,.10)" },
-        { L"rec",   L"Shortcuts, closed tabs", L"Start-page tiles and the reopen list",                L"rgba(17,17,17,.10)" },
-        { L"ctr",   L"Block counters",         L"The totals you see on the shield",                    L"rgba(17,17,17,.10)" } };
+        { L"rec",   L"Closed tabs",            L"The reopen list",                                     L"rgba(17,17,17,.10)" },
+        { L"ctr",   L"Block counters",         L"The totals you see on the shield",                    L"rgba(17,17,17,.10)" },
+        { L"dl",    L"Download list",          L"The list only; your files stay where they are",        L"rgba(17,17,17,.10)" },
+        { L"agt",   L"Assistant data",         L"Memory notes, permissions, files. Your API key stays", L"rgba(17,17,17,.10)" } };
     for (auto& r : rows)
         b += std::wstring(L"<div class=pr><i class=fill id=m_") + r.k + L" style=\"background:" + r.col + L"\"></i><div class=t><b>" + r.t + L"</b><small>" + r.d +
-             L"</small></div><div class=v id=v_" + r.k + L">0</div><input type=checkbox id=c_" + r.k + L" checked></div>";
+             L"</small></div><div class=v id=v_" + r.k + L">0</div><input class=cb type=checkbox id=c_" + r.k + L" checked></div>";
     b += LR"H(</div>
 <h2>Default browser</h2><div class=card><div class=row><div>Make Libra your default browser<small id=dsub>)H" + std::wstring(isDefault ? L"Libra is your default browser." : L"Windows asks you to confirm the choice in Settings.") +
          L"</small></div><button class=pri data-c=default.set>" + (isDefault ? L"Open settings" : L"Set as default") + L"</button></div></div>"
-         L"<p class=hint style=\"color:var(--mute);font-size:12px;margin:12px 6px\">Saved passwords and bookmarks are never touched here. Everything stays on this PC.</p>";
+         L"<p class=hint style=\"color:var(--mute);font-size:12px;margin:12px 6px\">Saved passwords, bookmarks, settings and your API key are never touched here. Everything stays on this PC.</p>";
     std::wstring js = LR"H(
-const $=s=>document.querySelector(s),KEYS=['hist','cook','site','cache','dns','rec','ctr'],base={},cur={};let range='all';
+const $=s=>document.querySelector(s),KEYS=['hist','cook','site','cache','dns','rec','ctr','dl','agt'],base={},cur={};let range='all';
 const isB={site:1,cache:1};
-function fmt(k,v){if(!isB[k])return v.toLocaleString();if(v<1024)return v+' B';if(v<1048576)return Math.round(v/1024)+' KB';if(v<1073741824)return (v/1048576).toFixed(1)+' MB';return (v/1073741824).toFixed(2)+' GB'}
+function fmt(k,v){if(!isB[k])return v.toLocaleString();if(v===0)return 'Empty';if(v<1048576)return '< 1 MB';if(v<1024)return v+' B';if(v<1048576)return Math.round(v/1024)+' KB';if(v<1073741824)return (v/1048576).toFixed(1)+' MB';return (v/1073741824).toFixed(2)+' GB'}
 function count(el,from,to,k,ms){const t0=performance.now();(function f(t){const p=Math.min(1,(t-t0)/ms),e=1-Math.pow(1-p,3);el.textContent=fmt(k,Math.round(from+(to-from)*e));if(p<1)requestAnimationFrame(f)})(t0)}
 function set(k,v,first){const el=$('#v_'+k),from=cur[k]||0;cur[k]=v;if(base[k]===undefined||v>base[k])base[k]=v;
  count(el,from,v,k,first?900:700);const m=$('#m_'+k);m.style.width=base[k]?Math.round(100*v/base[k])+'%':'0'}
 let first=true;
 function lbStats(s){KEYS.forEach(k=>set(k,s[k]||0,first));
  const tr=cur.trk||0;count($('#trk'),+($('#trk').dataset.v||0),s.trk||0,'x',900);$('#trk').dataset.v=s.trk||0;
- $('#blk').textContent=(s.blk||0).toLocaleString();$('#cdom').textContent=(s.cdom||0).toLocaleString();
- const tot=(s.site||0)+(s.cache||0),a=s.site||0,c=s.cache||0,h=(s.hist||0)*400;const sum=Math.max(1,tot+h);
+ $('#blk').textContent=(s.blk||0).toLocaleString();$('#vl').textContent=(s.vl||0).toLocaleString();$('#cdom').textContent=(s.cdom||0).toLocaleString();
+ const tot=(s.site||0)+(s.cache||0),a=s.site||0,c=s.cache||0,h=(s.hist||0)*400;const sum=Math.max(1048576,tot+h);
  $('#tot').textContent=fmt('site',tot);$('#s1').style.width=100*h/sum+'%';$('#s2').style.width=100*a/sum+'%';$('#s3').style.width=100*c/sum+'%';first=false}
 function lbCleared(s,txt){lbStats(s);const m=$('#msg');m.innerHTML=txt;m.style.opacity=1;document.querySelector('.hero').classList.remove('pulse');void document.querySelector('.hero').offsetWidth;document.querySelector('.hero').classList.add('pulse');$('#go').disabled=false;$('#go').textContent='Clear selected'}
+$('#sa').onclick=e=>{e.preventDefault();const bs=KEYS.map(k=>$('#c_'+k)),all=bs.every(b=>b.checked);bs.forEach(b=>b.checked=!all)};
 document.getElementById('rg').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;range=b.dataset.r;document.querySelectorAll('#rg button').forEach(x=>x.classList.toggle('on',x===b))});
 $('#go').onclick=()=>{const ks=KEYS.filter(k=>$('#c_'+k).checked);if(!ks.length){$('#msg').textContent='Pick something to clear.';return}
  $('#go').disabled=true;$('#go').textContent='Clearing...';$('#msg').style.opacity=.4;P('priv.clear',ks.join(','),range)};

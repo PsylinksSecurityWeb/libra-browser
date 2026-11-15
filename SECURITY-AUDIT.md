@@ -1,7 +1,7 @@
 # Libra Browser: security and privacy audit
 
 ## Privacy rule
-Libra's own code collects nothing and has no telemetry, accounts or analytics. Optional, switchable network contacts: search suggestions go to the search engine you chose (Settings > Privacy and speed, on by default), and Microsoft SmartScreen if you leave it on.
+Libra's own code collects nothing and has no telemetry, accounts or analytics. Optional, switchable network contacts: search suggestions go to the search engine you chose (Settings > Privacy, on by default), Microsoft SmartScreen if you leave it on, and, once a day, the signed list of sponsored items (Settings > Privacy > Show sponsored content; no cookies, no ID, no user data in the request).
 Its main network contact is the DNS server `dns.psylinks-beta.com` (every site name is looked up there).
 History, bookmarks, settings, pinned tabs and the DNS cache stay in `%LOCALAPPDATA%\LibraBrowser\` on the PC.
 
@@ -30,6 +30,26 @@ Certificate errors cannot be bypassed silently (a Proceed button, per site, for 
 ## Known limits (cannot be fixed inside Libra)
 - WebView2 (Microsoft's engine) keeps one direct background connection to a Microsoft service that bypasses our proxy and DNS.
   Only Windows or enterprise policy can turn that off (not changed here: system setting).
-- The proxy listens on 127.0.0.1 only, but any program of the same Windows user can use it.
+- The proxy listens on 127.0.0.1 only and accepts connections only from Libra Browser's own process tree. Malware running as the same Windows user can still read anything that user can read.
 - The exe is not code-signed.
 - "Proceed anyway" on a bad certificate is the user's responsibility.
+
+## Audit 2026-11-15 (version 3.8.4, beta)
+- **Secrets:** the source, tests, docs and release files were searched for API-key patterns (OpenAI, Anthropic, Google, Groq, xAI, GitHub, bearer tokens). None found; the only match is an obviously fake test string. The user's API key lives only in an encrypted file (Windows DPAPI), is never shown, and is sent only to the provider the user chose. "Clear browsing data" never deletes it.
+- **Device details:** the code never reads the computer name, user name, hardware ids, disk serials or network adapters. Sites see one generic Windows identity that changes daily. The compiler's build-folder text is removed from the release exes.
+- **Test hooks:** the `LIBRA_TEST_*` environment variables used by our automated tests (auto-answering Agent questions, opening pages, picking files) now work only if a file named `libra-test.enabled` sits next to the exe. Release packages never contain it, so another program cannot use these variables to weaken a safety check.
+- **Assistant closed = the AI sees nothing:** every command that reads or acts on a page sits behind one gate that only a task typed in the open panel can open; closing the panel by any route stops the task. Test: 0 model requests in 25 s of browsing, nothing added to the page.
+- **Auto suggest (local, no AI):** designed from how Chrome, Firefox and Safari handle autofill: it opens only after a real click or key press (script focus, autofocus and made-up events are ignored), the popup is kept inside the page area (a forged position is refused), sensitive boxes and sign-in forms are never offered, the text is typed only after the user clicks Libra's own popup and only into the same still-empty box. The page script reports only the clicked box's label, name, type and position.
+- **Clearing is verified:** every data kind is cleared with its own call whose result is read, cookies and open pages' storage are swept a second time, the numbers shown after a clear come from the engine, and a failure is reported instead of "Cleared". Tested after a hard kill, a normal close, a forced failure and each time range.
+- **Ad paths are refused before the request:** a short reviewed list (no bare `/banners/` or single-word rules, so real pictures are not hit) in Max mode; checked on 10 large sites with zero false positives, and the real AdBlock Tester page scores 100/100.
+- **Menu crash fixed:** an empty menu entry could crash the browser when the menu was opened.
+
+## 3.8.4 agent review
+
+- API keys are stored using Windows DPAPI and are sent only to the configured endpoint. Redirects are disabled for model requests.
+- The assistant is disabled in private windows and Child Safety mode. Web pages cannot use the internal agent message channel.
+- File uploads are limited to files the user selects or copies into the agent sandbox.
+- The agent refuses password, card and one-time-code fields and pauses for human checks.
+- Permission and task scopes use exact hostnames rather than guessed registrable domains, avoiding cross-site permission sharing on public suffixes such as `github.io` and `co.uk`.
+- The optional voice pack is downloaded only on request and checked against pinned SHA-256 values before installation.
+- The agent remains beta software. Users should review every result and must not rely on it for financial, legal or safety-critical actions.

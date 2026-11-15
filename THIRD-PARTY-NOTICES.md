@@ -1,6 +1,6 @@
 # Third-party notices
 
-Libra Browser source code is licensed under the Apache License 2.0 (see `LICENSE` and `NOTICE`). The Libra name, logos, icons, artwork, and trademarks remain reserved and are not licensed except as permitted by Apache-2.0's trademark clause. It builds on the following; each keeps its own license.
+Libra Browser itself is under the Apache-2.0 license (see `LICENSE`). It builds on the following; each keeps its own license.
 
 | Component | Used for | License |
 |---|---|---|
@@ -13,7 +13,7 @@ Libra Browser source code is licensed under the Apache License 2.0 (see `LICENSE
 
 ## Trademarks and artwork
 - Search-engine names and small logos (Google, DuckDuckGo, Bing, Brave, Startpage, Ecosia, Perplexity) belong to their owners and are used only to identify the engine in the picker.
-- The Libra name, icon and the animated first-run videos were created for this project by Psylinks Security Private Limited. The videos were produced with AI video tools. Source-code licensing and trademark rights are described in `LICENSE` and `NOTICE`; third-party logos and names remain subject to their owners' terms.
+- The Libra name, icon and the animated first-run videos were created for this project by Psylinks Security Private Limited. The videos were produced with AI video tools; they are part of this repository and covered by the project license.
 
 ## Services Libra can contact (all visible in Settings)
 | Service | Why | Can it be turned off? |
@@ -22,3 +22,7 @@ Libra Browser source code is licensed under the Apache License 2.0 (see `LICENSE
 | Your search engine's suggestion service | Address-bar and new-tab suggestions | Yes: Settings > Privacy and speed > Search suggestions |
 | Microsoft SmartScreen | Warns about phishing/malware sites (sends site addresses to Microsoft) | Yes: Settings |
 | Microsoft WebView2 runtime background connection | Engine updates and diagnostics, controlled by Windows, outside Libra's proxy | Only via Windows or enterprise policy |
+
+- Lucide icons (https://lucide.dev), ISC licence: assistant panel icons (sparkles, square-pen, book-open, settings, x, chevron-left, arrow-up, square).
+
+- whisper.cpp (MIT, https://github.com/ggml-org/whisper.cpp) and the OpenAI Whisper base model weights (MIT): optional offline voice input; downloaded on request, not bundled.

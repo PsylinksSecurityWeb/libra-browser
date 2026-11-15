@@ -5,6 +5,7 @@
 // no fallback: if the DoH server is unreachable the site fails to load (by design).
 #include "pch.h"
 #include "Data.h"
+#include "Verdicts.h"
 #include <functional>
 #include <iphlpapi.h>
 #include <tlhelp32.h>
@@ -63,7 +64,7 @@ public:
     // Returns the loopback port (0 on failure).
     int Start(const wchar_t* dohHost, const wchar_t* dohPath, const std::wstring& cacheFile) {
         WSADATA w; if (WSAStartup(MAKEWORD(2, 2), &w)) return 0;
-        m_path = dohPath; m_file = cacheFile; LoadCache();
+        m_path = dohPath; m_file = cacheFile; LoadCache(); { size_t sl = cacheFile.find_last_of(L'\\'); Verdicts::Get().Init((sl == std::wstring::npos ? std::wstring() : cacheFile.substr(0, sl + 1)) + L"net.idx"); }
         m_ses = WinHttpOpen(L"Libra", WINHTTP_ACCESS_TYPE_NO_PROXY, nullptr, nullptr, 0);
         if (!m_ses) return 0;
         DWORD maxc = 32;   // WinHTTP allows only 2 simultaneous requests per server by default: a cold page queued behind that
@@ -103,7 +104,7 @@ public:
     static bool AdLike(const std::string& h) { return IsAdLike(h); }
     static int Cat(const std::string& h) { return Category(h); }
     size_t CacheSize() { std::lock_guard<std::mutex> g(m_mu); return m_cache.size(); }
-    void ClearCache() { std::lock_guard<std::mutex> g(m_mu); m_cache.clear(); m_sys.clear(); m_failed.clear(); m_dirty = true; }
+    void ClearCache() { Verdicts::Get().Clear(); std::lock_guard<std::mutex> g(m_mu); m_cache.clear(); m_sys.clear(); m_failed.clear(); m_dirty = true; }
     bool IsBlocked(const std::string& h) { std::lock_guard<std::mutex> g(m_mu); auto it = m_cache.find(h); return it != m_cache.end() && it->second.blocked; }
     bool DnsFailed(const std::string& h) { std::lock_guard<std::mutex> g(m_mu); auto it = m_failed.find(h); return it != m_failed.end() && time(nullptr) - it->second < 60; }
 
@@ -147,6 +148,7 @@ private:
         std::string out;
         { std::lock_guard<std::mutex> g(m_mu); if (!m_dirty) return; m_dirty = false;
           for (auto& kv : m_cache) {
+              if (kv.second.blocked) continue;   // blocked names are kept only as hashes in Verdicts.h, never as readable names
               out += kv.first + "\t" + std::to_string(kv.second.exp) + "\t" + (kv.second.blocked ? "1" : "0") + "\t";
               for (auto& a : kv.second.a) { char b[64]; InetNtopA(a.fam, a.b, b, 64); out += std::string(b) + ","; }
               out += "\n";
@@ -223,6 +225,16 @@ private:
         if (mapped && b[10] == 0xFF && b[11] == 0xFF) { Addr v4{}; v4.fam = AF_INET; memcpy(v4.b, b + 12, 4); return IsPrivate(v4); }   // ::ffff:a.b.c.d
         return false;
     }
+    // Extra Max-mode deny list (names only, no wildcards in the middle). Exact names are single hosts; the rest match the name and every sub-name.
+    static void reply403(SOCKET c) { static const char r[] = "HTTP/1.1 403 Blocked\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"; SendAll(c, r, (int)strlen(r)); closesocket(c); }
+    static bool LocalDeny(const std::string& h) {
+        static const char* exact[] = { "dai.google.com", "redirector.googlevideo.com" };   // server-side ad insertion; video-server fallback (not the real video hosts)
+        static const char* sfx[] = { "connatix.com",                                       // video ad network
+            "cookielaw.org", "onetrust.com", "cookiebot.com", "trustarc.com", "privacy-center.org", "privacy-mgmt.com", "usercentrics.eu" };   // consent pop-up scripts
+        for (auto e : exact) if (h == e) return true;
+        for (auto d : sfx) { size_t n = strlen(d); if (h == d || (h.size() > n && h.compare(h.size() - n - 1, std::string::npos, std::string(".") + d) == 0)) return true; }
+        return false;
+    }
     // Balanced mode: only things that look like AD networks may be let through; trackers/analytics and unknown names stay blocked.
     static bool IsAdLike(const std::string& h) {
         static const char* trk[] = { "analytics", "track", "telemetry", "pixel", "beacon", "stats", "metric", "collect", "insight", "segment", "mixpanel", "hotjar", "clarity", "quantserve", "bluekai", "scorecard", "krxd", "omtrdc", "demdex", "amplitude", "fullstory", "newrelic", "sentry", "tagmanager" };
@@ -295,6 +307,13 @@ private:
           } }
         if (found) { if (stale) Refresh(host); return !addrs.empty(); }
         return Fetch(host, addrs, isBlocked);
+    }
+    std::set<std::string> m_vSeen;
+    void VerdictRecheck(const std::string& host) {   // an older remembered name: ask the cloud once in the background, renew or forget it
+        { std::lock_guard<std::mutex> g(m_mu); if (!m_refreshing.insert("v:" + host).second) return; }
+        std::thread([this, host] { std::vector<Addr> a; bool b = false; bool ok = Fetch(host, a, b);
+            if (b) Verdicts::Get().Put(host); else if (ok) Verdicts::Get().Remove(host);
+            std::lock_guard<std::mutex> g(m_mu); m_refreshing.erase("v:" + host); m_vSeen.erase(host); }).detach();
     }
     void Refresh(const std::string& host) {
         { std::lock_guard<std::mutex> g(m_mu); if (!m_refreshing.insert(host).second) return; }
@@ -401,13 +420,25 @@ private:
             for (auto d : doh) { std::string k = d; if (host == k || (host.size() > k.size() && host.compare(host.size() - k.size() - 1, std::string::npos, "." + k) == 0)) { static const char r[] = "HTTP/1.1 403 Blocked\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"; SendAll(c, r, (int)strlen(r)); closesocket(c); return; } }
         }
 
+        if (m_mode == 0 && LocalDeny(host)) {   // Max: ad/consent hosts our cloud list does not know yet
+            ++blocked; if (onBlockedHit) onBlockedHit(host);
+            reply403(c); return;
+        }
         std::vector<Addr> addrs; bool blk = false; bool ok;
         in_addr v4; in6_addr v6;
         if (InetPtonA(AF_INET, host.c_str(), &v4) == 1) { Addr a{}; a.fam = AF_INET; memcpy(a.b, &v4, 4); addrs.push_back(a); ok = true; }
         else if (InetPtonA(AF_INET6, host.c_str(), &v6) == 1) { Addr a{}; a.fam = AF_INET6; memcpy(a.b, &v6, 16); addrs.push_back(a); ok = true; }
         else if (host == "localhost") { Addr a{}; a.fam = AF_INET; a.b[0] = 127; a.b[3] = 1; addrs.push_back(a); ok = true; }
         else {
-            ok = Resolve(host, addrs, blk);
+            int vd = m_mode == 0 ? Verdicts::Get().Lookup(host) : 0;   // Max: a name the cloud blocked before is answered on this PC
+            if (vd) {
+                ++Verdicts::Get().localHits; ok = false; blk = true;
+                { std::lock_guard<std::mutex> g(m_mu); if (m_vSeen.insert(host).second && onBlocked) onBlocked(host); }
+                if (vd == 2) VerdictRecheck(host);
+            } else {
+                ok = Resolve(host, addrs, blk);
+                if (m_mode == 0) { ++Verdicts::Get().cloudAsks; if (!ok && blk) Verdicts::Get().Put(host); }
+            }
             if (!ok && blk && m_mode == 1 && MayPass(host) && Pass(host) && SysResolve(host, addrs)) {   // Balanced: let some ads through
                 ok = true; blk = false; if (onLetThrough) onLetThrough(host);
             }

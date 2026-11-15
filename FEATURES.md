@@ -4,44 +4,46 @@
 
 *Built by Psylinks Security Private Limited, India.*
 
-## What is Libra?
+## What is Libra Browser?
 
-Libra is a free web browser for Windows that does one job well: it lets you use the internet without being followed, flooded with ads, or slowed down. It installs in seconds (the whole app is about 3 MB), opens fast, and has privacy and ad blocking switched on from the first minute. There is no account to make and nothing to set up.
+Libra Browser is a free, security-focused web browser for Windows that does one job well: it lets you use the internet without being followed, flooded with ads, or slowed down. It installs in seconds (the whole app is about 3 MB), opens fast, and has privacy and ad blocking switched on from the first minute. There is no account to make and nothing to set up.
 
-## The problems people have, and how Libra solves them
+## The problems people have, and how Libra Browser solves them
 
-| The problem | What it feels like | How Libra solves it |
+| The problem | What it feels like | How Libra Browser solves it |
 |---|---|---|
-| **"Ads are everywhere."** | Pages jump around, pop-ups cover the text, videos start by themselves. | Libra stops ads before they reach your screen and tidies up the empty gaps. Pages are cleaner and open faster. |
-| **"Websites follow me around."** | You look at shoes once, and shoe ads chase you for weeks. | Trackers are blocked. Sites also can't easily recognise your device, because Libra changes the small details they use to do it. |
-| **"I don't know who has my data."** | Big browsers want you to sign in and sync everything to their servers. | Libra has no sign-in, no sync and collects nothing. What is stored stays on your own PC, and one page lets you see it and delete it. |
-| **"My computer is slow."** | The browser eats memory, and ten tabs make the fan roar. | Libra is tiny. Tabs you aren't using go to sleep, and it asks before keeping a forgotten tab open. It is built to work well on older PCs. |
+| **"Ads are everywhere."** | Pages jump around, pop-ups cover the text, videos start by themselves. | Libra Browser stops ads before they reach your screen and tidies up the empty gaps. Pages are cleaner and open faster. |
+| **"Websites follow me around."** | You look at shoes once, and shoe ads chase you for weeks. | Trackers are blocked. Sites also can't easily recognise your device, because Libra Browser changes the small details they use to do it. |
+| **"I don't know who has my data."** | Big browsers want you to sign in and sync everything to their servers. | Libra Browser has no sign-in, no sync and collects nothing. What is stored stays on your own PC, and one page lets you see it and delete it. |
+| **"My computer is slow."** | The browser eats memory, and ten tabs make the fan roar. | Libra Browser is tiny. Tabs you aren't using go to sleep, and it asks before keeping a forgotten tab open. It is built to work well on older PCs. |
 | **"Downloads are slow and break."** | A big file fails at 90% and you start again. | Files download in several pieces at once, so they finish sooner. If it breaks, Retry carries on where it stopped. |
 | **"I worry about my children online."** | One wrong click and a child is on a site they should never see. | Child Safety mode blocks adult, scam and unsafe sites, keeps ads blocked, and is locked with your Windows password. |
 | **"I reuse the same weak password."** | Easy to remember, easy to steal. | A built-in password maker and a saved-passwords page, locked on your PC. Seeing a saved password asks for your Windows password first. |
-| **"Some sites break with an ad blocker."** | A bank or government site won't work. | Three levels for every website: Off, Balanced or Max. Pick what each site needs, and Libra remembers. |
+| **"Some sites break with an ad blocker."** | A bank or government site won't work. | Three levels for every website: Off, Balanced or Max. Pick what each site needs, and Libra Browser remembers. |
 | **"Browsers are complicated."** | Menus inside menus, settings you don't understand. | A calm white-and-grey design. A short first start. Plain words everywhere. |
 
 ## Why free and private can go together
 
-Many free browsers pay for themselves with your data. Libra doesn't. It is made by a security company, Psylinks Security Private Limited, that builds privacy tools. Libra has no ads, no tracking and no account system to feed. You are not the product.
+Many free browsers pay for themselves with your data. Libra Browser doesn't. It is made by a security company, Psylinks Security Private Limited, that builds privacy tools. Libra Browser has no tracking and no account system to feed. Optional, clearly labelled sponsored links and a sponsored picture can appear on the new-tab page. They are chosen on your PC, nothing about you is sent, and one click in Settings turns them off. You are not the product.
 
 ---
 
-## New in this version
+## New in this version (3.8.4, beta)
 
-- **Child Safety mode (Settings > Family).** One switch blocks adult, scam and unsafe sites and keeps ad blocking on. Turning it on or off needs the Windows password, PIN or fingerprint, so a child can't switch it off. A parent can unlock a single site for 30 minutes. Off is not available for ad blocking while the mode is on. If a PC has no Windows password, Libra says so plainly. For the strongest protection, give your child a standard Windows account.
-- **Smarter Balanced mode.** On any site, Balanced lets about half of the ad networks load and keeps all the trackers blocked. A different half shows each time you reload.
-- **Sites that need sensors.** Where you set a site to Off (for example, a government or banking site), Libra allows motion sensors for that visit. Everywhere else they stay blocked.
-- **Download and "blocked" cards** slide in from the right side and slide away by themselves.
-- **Password page is locked with Windows.** Show and Copy ask for your Windows sign-in, then stay open for 5 minutes.
-- **A clean first start.** Only the welcome film shows first, with no toolbar until it ends.
+- **AI Assistant (beta, optional).** Bring your own API key. It can fill forms and read pages for you, asks before anything risky, never types passwords or card numbers, and never solves CAPTCHAs. **When the assistant is closed, the AI sees nothing**: nothing is read for it and nothing is sent.
+- **Auto suggest (optional, no AI, this PC only).** Click an empty name, e-mail, phone or company box and Libra Browser offers the matching value from your own saved notes in its own popup. It opens only after a real click or Tab key and never for passwords, user names, cards or ID numbers.
+- **Sponsored content (optional, off in one click).** A few clearly labelled links and one picture on the new-tab page, hand-approved, signed, no tracking. Settings > Privacy > Show sponsored content.
+- **Ad banners on a site's own server are blocked before they load.** Besides the cloud name list, a short reviewed list of ad paths (such as `/ads/banners/`, `_ads_banner.` file names and Flash files) is refused in Max mode before the request is sent, and what is left (broken pictures, empty Flash boxes) is removed. The AdBlock Tester score went from 78 to 100.
+- **Clear browsing data really clears, and tells you the truth.** Tick boxes with a time range (last hour to all time). Each kind (history, cookies and sign-in data, site data, cached files) is cleared and checked; anything left is swept again; the result line shows real numbers ("Removed 8 cookies, 1.0 MB of cached files...") or says what could not be cleared. GPU, shader and code caches are removed at the next start. Your API key, bookmarks and saved logins are never touched.
+- **Settings on one vertical page** and a **Beta** label, because small errors can still happen and we improve it every day.
+- **Child Safety mode (Settings > Family).** One switch blocks adult, scam and unsafe sites and keeps ad blocking on. Turning it on or off needs the Windows password, PIN or fingerprint.
+- **Smarter Balanced mode, sites that need sensors, sliding cards, a locked password page and a clean first start** from earlier versions.
 
 ---
 
-## Why people switch to Libra
+## Why people switch to Libra Browser
 
-| You want | What Libra does |
+| You want | What Libra Browser does |
 |---|---|
 | Fewer ads | Blocks ads and trackers before the page even loads, so pages open faster. |
 | Privacy | We collect nothing about you. No account, no sign-in, no tracking. |
@@ -59,15 +61,15 @@ Many free browsers pay for themselves with your data. Libra doesn't. It is made 
   - **Balanced**: trackers always blocked, some ads allowed, so sites you want to support still earn.
   - **Max**: everything blocked. This is the default.
 - A shield button next to the address bar shows what was blocked on the page you're looking at: ads, trackers, analytics and social trackers, with the top blocked names.
-- Your Privacy page shows a 7-day report of what Libra stopped.
-- The first time Libra blocks a lot, a small card slides in from the right to tell you.
+- Your Privacy page shows a 7-day report of what Libra Browser stopped.
+- The first time Libra Browser blocks a lot, a small card slides in from the right to tell you.
 
 ## 2. Private by design
 
 - **No data collection.** We don't collect your browsing, searches, or personal details.
 - **Private name lookups.** The addresses of websites you visit are looked up through our own secure service, not your internet provider's open lookup.
-- **Protection from "fingerprinting".** Sites try to recognise you by your screen, graphics card and other small details. Libra changes or hides these, differently for every site and every time you open the browser.
-- **HTTPS first.** If a site can be opened securely, Libra opens it securely. If a site is not secure, Libra warns you first.
+- **Protection from "fingerprinting".** Sites try to recognise you by your screen, graphics card and other small details. Libra Browser changes or hides these, differently for every site and every time you open the browser.
+- **HTTPS first.** If a site can be opened securely, Libra Browser opens it securely. If a site is not secure, Libra Browser warns you first.
 - **Third-party cookie blocking.** Available in Settings (off by default, because it can break some sign-ins).
 - **Your computer's network address stays hidden** from websites that try to find it.
 - **Private window.** Nothing is saved: no history, cookies or site data. When you close it, it's gone.
@@ -86,8 +88,8 @@ Many free browsers pay for themselves with your data. Libra doesn't. It is made 
 
 - Starts fast. Small download.
 - **Sleeping tabs.** Tabs you aren't using go to sleep within seconds and wake when you click them. In our test, 15 tabs used about half the memory they used before.
-- **Unused tab reminder.** After 20 minutes unused, Libra asks if you want to close a tab. You can turn this off.
-- Gentle on older and low-memory computers. Libra uses fewer connections and less memory there.
+- **Unused tab reminder.** After 20 minutes unused, Libra Browser asks if you want to close a tab. You can turn this off.
+- Gentle on older and low-memory computers. Libra Browser uses fewer connections and less memory there.
 - Light mode for even lower use.
 
 ## 5. Downloads that feel fast
@@ -107,7 +109,7 @@ Many free browsers pay for themselves with your data. Libra doesn't. It is made 
 ## 7. Passwords built in
 
 - **Password generator.** Make strong passwords from 1 to 286 characters. Choose which characters to use, avoid look-alikes, and see how strong it is.
-- **Saved logins.** Libra always asks before saving: Save, Not now, or Never for this site.
+- **Saved logins.** Libra Browser always asks before saving: Save, Not now, or Never for this site.
 - Passwords are locked with your Windows account and stored only on your computer. They are never sent anywhere.
 - One click fills your login, only on the exact website it was saved for.
 - Copied passwords are cleared from the clipboard after 30 seconds.
@@ -125,14 +127,24 @@ Many free browsers pay for themselves with your data. Libra doesn't. It is made 
 - A home page with your favourite sites. Edit, rename or remove tiles.
 - Full-screen mode (F11) and keyboard shortcuts.
 - Light mode.
-- Settings in simple tabs: Search, On startup, Downloads, Privacy and speed, Media, About.
-- Set Libra as your default browser from inside the app. Windows asks you to confirm, and Libra never changes it silently.
+- Settings on one vertical page, grouped: Search, Startup, Downloads, Privacy, Media, AI Agent, Family, About.
+- Set Libra Browser as your default browser from inside the app. Windows asks you to confirm, and Libra Browser never changes it silently.
 
 ## 10. A calm first launch
 
-The very first time you open Libra, you see only a short film, then a few easy steps: pick a search engine, then choose whether to make Libra your default browser. No toolbar until you finish. About a minute from install to browsing.
+The very first time you open Libra Browser, you see only a short film, then a few easy steps: pick a search engine, then choose whether to make Libra Browser your default browser. No toolbar until you finish. About a minute from install to browsing.
 
-## 11. Easy to install, easy to remove
+## 11. AI Assistant and Auto suggest (beta, optional)
+
+- An assistant panel that works for you on the page you are on: fill a form from your notes, read a page, check details. You add your own API key; Libra Browser sends nothing to Psylinks.
+- It stops by itself ("I am stuck") when it goes in circles, so tokens are not wasted.
+- It asks before anything risky (sending a form, paying, leaving for another site, downloading), never types passwords or card numbers, and stops and waits at CAPTCHAs.
+- Closed assistant = blind assistant: nothing is read for the AI and nothing is sent unless you open it and type a task.
+- Auto suggest: click an empty name, e-mail, phone or company box and pick the matching value from your own notes. No AI, no network, only after a real click or Tab, never for passwords, cards or ID numbers.
+
+---
+
+## 12. Easy to install, easy to remove
 
 - One small installer. No administrator rights needed.
 - Adds a desktop and Start menu shortcut.
@@ -140,9 +152,9 @@ The very first time you open Libra, you see only a short film, then a few easy s
 
 ---
 
-## How Libra is different
+## How Libra Browser is different
 
-| | Libra | Chrome | Edge | Brave | Firefox |
+| | Libra Browser | Chrome | Edge | Brave | Firefox |
 |---|---|---|---|---|---|
 | Ad and tracker blocking built in | Yes, per-site 3 levels | No | Partial | Yes | Partial |
 | We collect nothing about you | Yes | No | No | Mostly | Mostly |
@@ -157,8 +169,8 @@ The very first time you open Libra, you see only a short film, then a few easy s
 *The competitor columns describe common default behaviour. Browsers change. Check before you quote them in public.*
 
 **In one line for each:**
-- **vs Chrome:** Libra doesn't make money from your data.
-- **vs Edge:** Libra doesn't push shopping, news or an account.
+- **vs Chrome:** Libra Browser doesn't make money from your data.
+- **vs Edge:** Libra Browser doesn't push shopping, news or an account.
 - **vs Brave:** Same idea, a much smaller and simpler app, with ad blocking in 3 levels per site.
 - **vs Firefox:** Lighter, and everything is already on without setup.
 
@@ -181,16 +193,16 @@ The very first time you open Libra, you see only a short film, then a few easy s
 
 ---
 
-## Honest notes (what Libra is not, yet)
+## Honest notes (what Libra Browser is not, yet)
 
-- Libra runs on the Microsoft WebView2 engine (the same base as Edge). Windows may send some basic system data to Microsoft. We reduce this, but can't fully switch it off.
-- Libra hides website names from your internet provider's lookups, but the provider can still see which servers you connect to. It is not a VPN or Tor.
+- Libra Browser runs on the Microsoft WebView2 engine (the same base as Edge). Windows may send some basic system data to Microsoft. We reduce this, but can't fully switch it off.
+- Libra Browser hides website names from your internet provider's lookups, but the provider can still see which servers you connect to. It is not a VPN or Tor.
 - Windows only. No phone version, no sync, and no extensions yet.
 - Importing bookmarks and history from other browsers is coming later.
 - The app isn't code-signed yet, so Windows may show a "publisher unknown" warning on first install.
 - The source code is viewable, but it is not open source. See the LICENSE file.
 - Some sites with strict CAPTCHAs may need Balanced or Off.
-- In Child Safety mode, site names are also checked with a public family service (CleanBrowsing). Libra's own server will replace it later. It does not cover gambling sites yet. A person with administrator rights can still get around any app lock, so use a standard Windows account for children.
+- In Child Safety mode, site names are also checked with a public family service (CleanBrowsing). Libra Browser's own server will replace it later. It does not cover gambling sites yet. A person with administrator rights can still get around any app lock, so use a standard Windows account for children.
 
 ---
 

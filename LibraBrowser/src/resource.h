@@ -38,6 +38,7 @@
 #define IDC_BTN_REFRESH        1004
 #define IDC_BTN_MENU           1005
 #define IDC_BTN_SHIELD         1007
+#define IDC_BTN_AGENT          1008
 #define IDC_TAB_BAR            1006
 
 // Timer IDs

@@ -20,7 +20,7 @@ inline std::wstring PageShell(const std::wstring& title, const std::wstring& bod
                               const std::wstring& active = L"", bool sidebar = true, bool footer = true) {
     std::wstring side;
     if (sidebar)
-        side = L"<aside><div class=brand>LIBRA</div><button class=pri data-c=newtab>New tab</button><button data-c=private>New private tab</button><nav>" +
+        side = L"<aside><div class=brand>LIBRA<span class=beta>BETA</span></div><button class=pri data-c=newtab>New tab</button><button data-c=private>New private tab</button><nav>" +
                NavItem(L"home", L"E80F", L"Home", active) + NavItem(L"tabs", L"E7C4", L"Tabs", active) + NavItem(L"history", L"E81C", L"History", active) +
                NavItem(L"downloads", L"E896", L"Downloads", active) + NavItem(L"bookmarks", L"E734", L"Bookmarks", active) +
                NavItem(L"passwords", L"E72E", L"Passwords", active) + NavItem(L"privacy", L"E7B3", L"Privacy", active) + NavItem(L"settings", L"E713", L"Settings", active) + L"</nav><div class=made>Built by Psylinks Security Private Limited</div></aside>";
@@ -55,6 +55,9 @@ aside button.pri{background:#111}
 input[type=checkbox]{appearance:none;-webkit-appearance:none;width:44px;height:26px;border-radius:13px;background:#d2d2d2;position:relative;cursor:pointer;flex-shrink:0;transition:background .15s}
 input[type=checkbox]::after{content:'';position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#fff;box-shadow:none;transition:left .15s}
 input[type=checkbox]:checked{background:#111}input[type=checkbox]:checked::after{left:21px}
+input.cb{width:20px;height:20px;border-radius:6px;border:1.6px solid #b4b4b4;background:#fff;transition:background .12s,border-color .12s}
+input.cb::after{top:1px;left:5.5px;width:5px;height:10px;border:solid #fff;border-width:0 2px 2px 0;border-radius:0;background:transparent;transform:rotate(45deg) scale(0);transition:transform .12s}
+input.cb:checked{background:#111;border-color:#111}input.cb:checked::after{left:5.5px;transform:rotate(45deg) scale(1)}
 .top{display:flex;gap:12px;margin-bottom:16px}.top input{flex:1;background:var(--card);box-shadow:none}
 .item{display:flex;gap:14px;align-items:center;padding:13px 0}
 .t{flex:1;min-width:0}.t a{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--fg);text-decoration:none;font-weight:500}
@@ -88,7 +91,8 @@ main>:nth-child(2){animation-delay:.05s}main>:nth-child(3){animation-delay:.1s}m
 .eng button:hover{transform:translateY(-2px);box-shadow:none}
 .eng button{transition:background .15s,color .15s,transform .15s,box-shadow .15s}
 /* shared look: white canvas, flat 1px cards, heavy headline, black active item */
-aside{border-right:1px solid #eee}.brand{font-weight:800;letter-spacing:.02em;font-size:20px}
+aside{border-right:1px solid #eee}.brand{font-weight:800;letter-spacing:.02em;font-size:20px}.beta{display:inline-block;margin-left:8px;padding:2px 7px;border:1px solid #111;border-radius:99px;font-size:9px;font-weight:700;letter-spacing:.08em;vertical-align:4px}
+.bnote{color:#777;font-size:12.5px;margin:-14px 0 18px}
 nav a:hover{background:#f3f3f3}nav a.on{background:#111;color:#fff;box-shadow:none}
 h1{font:800 40px/1.1 'Segoe UI Variable Display','Segoe UI',sans-serif;letter-spacing:-.02em;margin-bottom:26px}
 .card{box-shadow:none;border:1px solid #eee;border-radius:18px}.top input{box-shadow:none;border:1px solid #eee;background:#fafafa}
@@ -121,12 +125,11 @@ inline std::wstring ToggleOn(const Settings& s, const wchar_t* k, const wchar_t*
 inline std::wstring SettingsPage(const Settings& s, bool grey, const std::wstring& cloud = L"On", long long blocked = 0) {
     std::wstring eng = s.Get(L"engine", L"Google"), st = s.Get(L"startup", L"home");
     bool cs = s.Get(L"child_safe", L"0") == L"1";
-    std::wstring b = L"<h1>Settings</h1><h2>Family</h2><div class=card><div class=row><div>Child Safety mode<small>" + std::wstring(cs
+    std::wstring b = L"<h1>Settings</h1><p class=bnote>Beta: Libra Browser is still being built. Small errors can happen, and we improve it every day.</p><h2>Family</h2><div class=card><div class=row><div>Child Safety mode<small>" + std::wstring(cs
         ? L"On. Adult, malware and scam sites are blocked and ads stay blocked. Turning it off needs your Windows password."
-        : L"Blocks adult, malware and scam sites and keeps ads blocked. Turning it on or off needs your Windows password. For full protection give your child a standard Windows account.")
+        : L"Blocks adult, malware and scam sites. Turning it on or off needs your Windows password.")
         + (s.Get(L"child_nolock", L"0") == L"1" ? L" Your Windows account has no password, so anyone can turn this off. Set a Windows password to lock it." : L"")
-        + L" Site names are checked with " + (s.Get(L"family_dns", L"").find(L"psylinks") != std::wstring::npos ? L"the Psylinks family list." : L"the public CleanBrowsing family service.")
-        + L" Anyone with administrator rights on this PC can remove the lock, so use a standard Windows account for your child."
+
         + L"</small></div><button class=pri data-c=family.toggle>" + (cs ? L"Turn off" : L"Turn on") + L"</button></div></div><h2>Search</h2><div class=card><div class=row><div>Search engine<small>Used by the address bar and the new tab page</small></div><select data-k=engine>";
     for (auto& e : kEngines) if (!e.ai) b += std::wstring(L"<option") + (eng == e.name ? L" selected" : L"") + L">" + e.name + L"</option>";
     b += L"<optgroup label=\"AI search\">";
@@ -136,15 +139,15 @@ inline std::wstring SettingsPage(const Settings& s, bool grey, const std::wstrin
     { const std::wstring key = L"<div class=row><div>Search engine<small>"; size_t at = b.find(key);
       if (at != std::wstring::npos) b.replace(at, key.size(), L"<div class=row><div>" + LogoHtml(eng == L"Custom" ? L"Custom" : eng) + L"Search engine<small>"); }
     b += L"<div class=row><div>Custom search URL<small>Starts with https:// and ends where the query goes, e.g. https://searx.example/search?q=</small></div><input type=text data-k=engine_url value=\"" + Esc(s.Get(L"engine_url")) + L"\"></div></div>";
-    b += L"<h2>On startup</h2><div class=card><div class=row><div>When Libra opens</div><select data-k=startup>";
+    b += L"<h2>Startup</h2><div class=card><div class=row><div>When Libra opens</div><select data-k=startup>";
     b += std::wstring(L"<option value=home") + (st == L"home" ? L" selected" : L"") + L">New tab page</option>";
     b += std::wstring(L"<option value=last") + (st == L"last" ? L" selected" : L"") + L">Continue where I left off</option>";
     b += std::wstring(L"<option value=url") + (st == L"url" ? L" selected" : L"") + L">A specific page</option></select></div>";
     b += L"<div class=row><div>Home page<small>Used when 'A specific page' is chosen</small></div><input type=text data-k=homepage value=\"" + Esc(s.Get(L"homepage")) + L"\"></div></div>";
     b += L"<h2>Downloads</h2><div class=card><div class=row><div>Save to<small>Empty means your Downloads folder</small></div><input type=text data-k=dl_dir value=\"" + Esc(s.Get(L"dl_dir")) + L"\"></div>";
     b += Toggle(s, L"dl_ask", L"Ask where to save each file") + L"</div>";
-    b += L"<h2>Privacy and speed</h2><div class=card><div class=row><div>Cloud ad blocking<small>Ads and trackers are stopped in the cloud before they load. Runs on the Psylinks private cloud (dns.psylinks-beta.com). Always on.</small></div><b>" + cloud + L"</b></div>"
-      L"<div class=row><div>Ads and trackers blocked<small>Since you started using Libra</small></div><b>" + std::to_wstring(blocked) + L"</b></div>" + ToggleOn(s, L"idle_prompt", L"Ask to close unused tabs", L"After a long time unused, Libra asks whether to close a tab") + ToggleOn(s, L"web_suggest", L"Search suggestions", L"Your search engine suggests words while you type (Perplexity uses DuckDuckGo)") + ToggleOn(s, L"https_upgrade", L"Upgrade to HTTPS", L"Opens the secure version of a site when there is one. Asks before using an insecure page.") + ToggleOn(s, L"fingerprint", L"Fingerprint protection", L"Adds tiny random changes to what sites can read from your device, different on every site and every launch. Follows the shield level.") + ToggleOn(s, L"block_3p", L"Block third-party cookies", L"Stops ad and tracking sites from following you between websites. Off by default: it can stop some CAPTCHAs and embedded sign-ins from loading. Restart to apply.", L"0");
+    b += L"<h2>Privacy</h2><div class=card><div class=row><div>Cloud ad blocking<small>Ads and trackers are stopped in the cloud before they load. Runs on the Psylinks private cloud (dns.psylinks-beta.com). Always on.</small></div><b>" + cloud + L"</b></div>"
+      L"<div class=row><div>Ads and trackers blocked<small>Since you started using Libra</small></div><b>" + std::to_wstring(blocked) + L"</b></div>" + ToggleOn(s, L"idle_prompt", L"Ask to close unused tabs", L"After a long time unused, Libra asks whether to close a tab") + ToggleOn(s, L"sponsored", L"Show sponsored content", L"Clearly labelled sponsored links and a sponsored picture on the new tab page. We do not track you: nothing about you is sent, and the choice of what to show happens on your PC. Hide any item with one click.") + ToggleOn(s, L"web_suggest", L"Search suggestions", L"Your search engine suggests words while you type (Perplexity uses DuckDuckGo)") + ToggleOn(s, L"https_upgrade", L"Upgrade to HTTPS", L"Opens the secure version of a site when there is one. Asks before using an insecure page.") + ToggleOn(s, L"fingerprint", L"Fingerprint protection", L"Adds tiny random changes to what sites can read from your device, different on every site and every launch. Follows the shield level.") + ToggleOn(s, L"block_3p", L"Block third-party cookies", L"Stops ad and tracking sites from following you between websites. Off by default: it can stop some CAPTCHAs and embedded sign-ins from loading. Restart to apply.", L"0");
     b += Toggle(s, L"perm_allow", L"Let secure sites use camera, microphone and location without asking", L"Off (recommended): Libra asks every time. Motion sensors are always blocked.");
     b += Toggle(s, L"smartscreen_off", L"Turn off Microsoft SmartScreen", L"SmartScreen warns about phishing and malware but sends site addresses to Microsoft. Off = more private, less protection.");
     { std::wstring bd = s.Get(L"block_default", L"0");
@@ -159,32 +162,61 @@ inline std::wstring SettingsPage(const Settings& s, bool grey, const std::wstrin
       b += std::wstring(L"<option value=normal") + (pf == L"normal" ? L" selected" : L"") + L">Normal</option></select></div>"; }
     b += Toggle(s, L"clear_start", L"Clear cookies and cache at startup") + Toggle(s, L"block_images", L"Data saver", L"Don't load images");
     b += Toggle(s, L"local_block", L"Local ad blocker", L"Extra layer, off by default. Open a new tab after changing.");
-    b += L"<div class=row><div>Browsing data<small>Cookies, cache and history</small></div><button class=pri data-c=clear>Clear now</button></div><div class=row><div>Privacy dashboard<small>See what Libra remembers and clear it piece by piece</small></div><button data-c=nav data-a=privacy>Open</button></div></div>";
+    b += L"<div class=row><div>Browsing data<small>Choose what to clear: history, cookies, sign-ins, cache and more</small></div><button class=pri data-c=nav data-a=privacy>Clear data...</button></div><div class=row><div>Privacy dashboard<small>See what Libra remembers and clear it piece by piece</small></div><button data-c=nav data-a=privacy>Open</button></div></div>";
     b += L"<h2>Media</h2><div class=card>" + Toggle(s, L"save_video", L"Save videos", L"Shows a quiet icon in the address bar when a page has a video you can save. Off by default.") + L"</div>";
-    b += L"<h2>About</h2><div class=card><div class=row><div>Libra Browser<small>Version 3.2. Built by Psylinks Security Private Limited. Secure, private and lightweight.</small></div></div>"
-        L"<div class=row><div>What Libra does<small>Blocks ads and trackers before they load. Upgrades sites to secure https. Blocks popups and downloads you did not ask for. Hides your browser fingerprint. Keeps a password vault and a password generator. Fast multi-connection downloads. Search suggestions from your own engine. Private windows that leave nothing behind. Light on memory and CPU. We collect nothing about you.</small></div></div>"
+    b += L"<h2>AI Agent</h2><div class=card><div class=row><div>Beta<small>The AI Agent is a beta feature. It can make mistakes, so check its work before you submit anything important.</small></div></div>"
+        + Toggle(s, L"agent_on", L"Agent",L"Lets you give Libra Browser a job, such as filling a form or reading a page for you. Off by default. While it is off, none of it runs.")
+        + ToggleOn(s, L"agent_btn", L"Show the Agent button in the toolbar", L"Turn this off to hide the Agent from the toolbar. Ctrl+Shift+Space still opens it.")
+        + L"<div class=row><div>Connection<small>" + (s.Get(L"agent_model").empty() ? std::wstring(L"Not connected yet. Open the Agent and choose a provider and add your API key.") : L"Model: " + Esc(s.Get(L"agent_model")) + L". Your API key is stored encrypted on this PC and is never shown.") + L"</small></div><button class=pri data-c=nav data-a=agent>Open the Agent</button></div>"
+        + Toggle(s, L"autosuggest", L"Auto suggest", L"When you click an empty box for your name, e-mail, phone, company and similar, Libra shows what is in the notes you saved in the Assistant's Memory, and types it when you click it. Never for passwords, user names, cards or ID numbers, and never on sign-in forms. It works on this PC only: no AI is used and nothing is sent anywhere. Off by default.")
+        + ToggleOn(s, L"agent_opt", L"Shorten my requests", L"Removes filler words before sending, so each job uses fewer tokens. Your meaning is kept.")
+        + ToggleOn(s, L"agent_vauto", L"Send voice requests automatically", L"After you speak, the text is sent right away. Turn off to review it first.")
+        + L"<div class=row><div>What the Agent can do<small>Open a site you name, read the page, click, type, choose from lists, fill forms from the notes you gave it, read and summarise pages, work in up to four research tabs, upload files you placed in its Files folder, and download files only after you say yes. It remembers details you tell it, and you can remove them any time.</small></div></div>"
+        L"<div class=row><div>What it never does<small>It never types passwords, card numbers or one-time codes, never solves CAPTCHAs or human checks (it stops and waits for you), never searches the web by itself, never opens pages inside Libra Browser (settings, vault), and never sees your saved passwords or files outside its Files folder.</small></div></div>"
+        L"<div class=row><div>You stay in control<small>Anything risky (sending or submitting a form, paying, leaving for another site, downloading, typing on a site you did not name) opens a Windows question first, and you choose how long to remember your answer. Review every answer before a form is sent. Press Stop at any time.</small></div></div>"
+        L"<div class=row><div>Your data<small>Your key and notes are encrypted with Windows on this PC. Page text goes only to the provider you chose, nothing goes to Psylinks. The Agent is disabled in private windows and in Child Safety mode.</small></div></div>"
+        L"<div class=row><div>Honest limits<small>An AI can make mistakes. Websites may try to trick it with hidden text, so it treats page text as data, not as orders. Check the review card before you submit anything important.</small></div></div></div>";
+    b += L"<h2>About</h2><div class=card><div class=row><div>Libra Browser<small>Version 3.8.4 (beta). Errors can happen; we are improving it. Built by Psylinks Security Private Limited. Secure, private and lightweight.</small></div></div>"
+        L"<div class=row><div>What Libra does<small>Blocks ads and trackers before they load. Upgrades sites to secure https. Blocks popups and downloads you did not ask for. Hides your browser fingerprint. Keeps a password vault and a password generator. Fast multi-connection downloads. Search suggestions from your own engine. Private windows that leave nothing behind. Light on memory and CPU. We collect nothing about you. The new-tab page may show labelled sponsored items; switch them off in Settings > Privacy.</small></div></div>"
         L"<div class=row><div>License<small>Source available: you can read the code. You may not change, share or sell it without written permission from Psylinks Security Private Limited. See the LICENSE file.</small></div></div>"
         L"<div class=row><div>Source code<small><a href=\"https://github.com/PsylinksSecurityWeb/libra-browser\" style=\"color:inherit\">github.com/PsylinksSecurityWeb/libra-browser</a></small></div></div></div>";
-    return PageShell(L"Settings", b, grey, LR"JS((function(){const m=document.querySelector('main'),hs=[...m.querySelectorAll('h2')];if(!hs.length)return;
-const st=document.createElement('style');st.textContent='.stabs{display:flex;gap:6px;flex-wrap:wrap;margin:-8px 0 20px}.stabs button{padding:9px 18px;background:#f3f3f3;font-weight:600;color:#555}.stabs button.on{background:#111;color:#fff}';document.head.appendChild(st);
-const groups=hs.map(h=>{const els=[];let n=h.nextElementSibling;while(n&&n.tagName!=='H2'){els.push(n);n=n.nextElementSibling}h.style.display='none';return{name:h.textContent,els}});
-const bar=document.createElement('div');bar.className='stabs';
-function show(i){groups.forEach((g,k)=>g.els.forEach(e=>e.style.display=k===i?'':'none'));[...bar.children].forEach((b,k)=>b.classList.toggle('on',k===i));window.__tab=groups[i].name}
-groups.forEach((g,i)=>{const b=document.createElement('button');b.textContent=g.name;b.onclick=()=>show(i);bar.appendChild(b)});
-m.insertBefore(bar,hs[0]);let s=0;if(window.__tab0){const k=groups.findIndex(g=>g.name===window.__tab0);if(k>=0)s=k}show(s)})();)JS", L"settings");
+    return PageShell(L"Settings", b, grey, LR"JS((function(){const m=document.querySelector('main'),hs=[...m.querySelectorAll('h2')];const f=hs.find(h=>h.textContent==='Family'),a=hs.find(h=>h.textContent==='About');if(!f||!a)return;const els=[f];let n=f.nextElementSibling;while(n&&n.tagName!=='H2'){els.push(n);n=n.nextElementSibling}els.forEach(e=>m.insertBefore(e,a))})();)JS", L"settings");
 }
 
 inline std::wstring HistoryPage(const std::vector<HistoryItem>& h, bool grey) {
-    std::wstring b = L"<h1>History</h1><div class=top><input type=text id=q placeholder=\"Search history\"><button data-c=hist.clear>Clear all</button></div><div class=card>";
+    std::wstring b = LR"H(<style>#cm{display:none;position:fixed;inset:0;background:rgba(255,255,255,.78);z-index:9;align-items:center;justify-content:center}#cm .box{background:#fff;border:1px solid #e6e6e6;border-radius:18px;width:460px;max-width:92vw;max-height:90vh;overflow:auto;padding:24px 26px}
+#cm h3{font-size:19px;font-weight:800;margin:0 0 4px}#cm p{color:#777;font-size:12.5px;margin:0 0 14px}#cm label.r{display:flex;gap:11px;align-items:flex-start;padding:8px 2px;cursor:pointer}#cm label.r input{margin-top:3px;accent-color:#111}#cm label.r small{display:block;color:#888;font-size:12px}
+#cm .bt{display:flex;gap:10px;justify-content:flex-end;margin-top:16px}#cm select{margin:0 0 8px;width:100%}#tst{position:fixed;right:22px;bottom:22px;background:#111;color:#fff;padding:11px 18px;border-radius:12px;font-size:13px;opacity:0;transition:opacity .25s;z-index:10}</style>
+<h1>History</h1><div class=top><input type=text id=q placeholder="Search history"><button id=clr>Clear browsing data</button></div>
+<div id=cm><div class=box><h3>Clear browsing data</h3><p>Choose what to remove. Bookmarks, saved logins, settings and your API key are never touched.</p>
+<select id=cr><option value=hour>Last hour</option><option value=day>Last 24 hours</option><option value=week>Last 7 days</option><option value=month>Last 4 weeks</option><option value=all selected>All time</option></select>
+<div style="font-size:12.5px;margin:2px 2px 6px"><a href="#" id=sall style="color:#111">Select all</a> &middot; <a href="#" id=snone style="color:#111">None</a></div>
+<label class=r><input class=cb type=checkbox value=hist checked><span>Browsing history<small>Pages you visited</small></span></label>
+<label class=r><input class=cb type=checkbox value=cook checked><span>Cookies and sign-in data<small>You will be signed out of most sites</small></span></label>
+<label class=r><input class=cb type=checkbox value=cache checked><span>Cached images and files<small>Frees disk space</small></span></label>
+<label class=r><input class=cb type=checkbox value=site checked><span>Site data<small>Local storage, databases, offline workers, site permissions</small></span></label>
+<label class=r><input class=cb type=checkbox value=dl><span>Download list<small>The list only; your files stay where they are</small></span></label>
+<label class=r><input class=cb type=checkbox value=rec><span>Closed tabs<small>The reopen list</small></span></label>
+<label class=r><input class=cb type=checkbox value=dns><span>Lookup memory<small>Names of the sites Libra looked up</small></span></label>
+<label class=r><input class=cb type=checkbox value=ctr><span>Block counters<small>The totals on the shield</small></span></label>
+<label class=r><input class=cb type=checkbox value=agt><span>AI Agent data<small>Memory notes, permissions and files. Your API key stays.</small></span></label>
+<div class=bt><button id=cx>Cancel</button><button class=pri id=cgo>Clear data</button></div></div></div><div id=tst></div><div class=card>)H";
     int shown = 0;
     for (int i = (int)h.size() - 1; i >= 0 && shown < 500; --i, ++shown) {
         wchar_t tm[32] = L""; struct tm lt; time_t t = (time_t)h[i].t;
         if (!localtime_s(&lt, &t)) wcsftime(tm, 32, L"%d %b, %H:%M", &lt);
-        b += L"<div class=item><div class=t><a href=\"" + Esc(h[i].url) + L"\">" + Esc(h[i].title.empty() ? h[i].url : h[i].title) + L"</a><small>" + Esc(h[i].url) + L" &middot; " + tm + L"</small></div><button data-c=hist.del data-a=" + std::to_wstring(i) + L">Remove</button></div>";
+        b += L"<div class=item data-t=" + std::to_wstring(h[i].t) + L"><div class=t><a href=\"" + Esc(h[i].url) + L"\">" + Esc(h[i].title.empty() ? h[i].url : h[i].title) + L"</a><small>" + Esc(h[i].url) + L" &middot; " + tm + L"</small></div><button data-c=hist.del data-a=" + std::to_wstring(i) + L">Remove</button></div>";
     }
     if (!shown) b += L"<div class=empty>Nothing here yet.</div>";
     b += L"</div>";
-    return PageShell(L"History", b, grey, L"q.oninput=()=>{const v=q.value.toLowerCase();document.querySelectorAll('.item').forEach(i=>i.style.display=i.textContent.toLowerCase().includes(v)?'':'none')}", L"history");
+    return PageShell(L"History", b, grey, LR"JS(q.oninput=()=>{const v=q.value.toLowerCase();document.querySelectorAll('.item').forEach(i=>i.style.display=i.textContent.toLowerCase().includes(v)?'':'none')};
+const cm=document.getElementById('cm'),cgo=document.getElementById('cgo');
+document.getElementById('clr').onclick=()=>{cm.style.display='flex'};document.getElementById('cx').onclick=()=>{cm.style.display='none'};
+cm.onclick=e=>{if(e.target===cm)cm.style.display='none'};document.addEventListener('keydown',e=>{if(e.key==='Escape')cm.style.display='none'});
+cgo.onclick=()=>{const ks=[...cm.querySelectorAll('input:checked')].map(i=>i.value);if(!ks.length){return}cgo.disabled=true;cgo.textContent='Clearing...';P('priv.clear',ks.join(','),document.getElementById('cr').value)};
+document.getElementById('sall').onclick=e=>{e.preventDefault();cm.querySelectorAll('input[type=checkbox]').forEach(i=>i.checked=true)};document.getElementById('snone').onclick=e=>{e.preventDefault();cm.querySelectorAll('input[type=checkbox]').forEach(i=>i.checked=false)};
+window.lbDone=(since,h,msg)=>{if(h){document.querySelectorAll('.item').forEach(i=>{if(!since||+i.dataset.t>=since)i.remove()});if(!document.querySelector('.item')){const c=document.querySelector('main .card:last-of-type');if(c)c.innerHTML='<div class=empty>Nothing here yet.</div>'}}
+cm.style.display='none';cgo.disabled=false;cgo.textContent='Clear data';const t=document.getElementById('tst');t.textContent=msg||'Cleared';t.style.opacity=1;setTimeout(()=>t.style.opacity=0,msg&&msg.length>40?6000:2200)})JS", L"history");
 }
 
 inline std::wstring BookmarksPage(const std::vector<BookmarkItem>& m, bool grey) {
@@ -310,7 +342,7 @@ html,body{background:#fff!important}
 @keyframes fade{from{opacity:0}to{opacity:1}}@keyframes shine{to{background-position:200% 0}}
 @media(max-width:560px){.panel{grid-template-columns:repeat(2,1fr)}}
 </style>
-<div class=hero id=hero><div class=st id=hst><video id=hv muted playsinline preload=auto src="https://libra-hero.local/op.mp4"></video><img id=hi alt="" src="https://libra-hero.local/text.png"></div><button id=hskip>Skip</button></div>
+<div class=hero id=hero><div class=st id=hst><video id=hv muted playsinline preload=auto src="https://libra-hero.local/op.mp4"></video><img id=hi alt="" src="https://libra-hero.local/text.png"></div></div>
 <div class=h2 id=h2><div class=st id=h2s><video id=h2v muted playsinline preload=none data-s="https://libra-hero.local/op2.mp4"></video><div class=tx>Eliminate security risk<br>from day one</div></div></div>
 <div class=h3 id=h3><div class=st id=h3s><video id=h3v muted playsinline preload=none data-s="https://libra-hero.local/op3.mp4"></video><div class=tx>Eliminated<br>privacy breakers</div></div></div>
 <div class=intro id=intro>
@@ -318,7 +350,7 @@ html,body{background:#fff!important}
 <section class=sl><svg class=thumb viewBox="0 0 24 24"><path class=st d="M4.5 1v11"/><path class=st d="M19.5 3v11"/><path class=st d="M8.5 0.5v7"/><path class=st d="M15.5 2v7"/><path pathLength=1 d="M12 4v11"/><path pathLength=1 d="m7.5 10.5 4.5 4.5 4.5-4.5"/><path pathLength=1 d="M5 20h14"/></svg><h2>Fast downloads</h2><p>Big files use several connections at once.</p></section>
 <section class=sl><svg class=thumb viewBox="0 0 24 24"><path pathLength=1 d="M12 2.5 4.5 5.4v5.7c0 4.6 3.1 8.5 7.5 10.4 4.4-1.9 7.5-5.8 7.5-10.4V5.4L12 2.5z"/><path pathLength=1 d="M8.8 14.5a2 2 0 0 1-.2-4 3.2 3.2 0 0 1 6.2.5 1.8 1.8 0 0 1 .2 3.5H8.8z"/></svg><h2>Cloud ad blocking</h2><p>Ads and trackers stop in the cloud, before they load.</p></section>
 <section class=sl><svg class=thumb viewBox="0 0 24 24"><path pathLength=1 d="M7 11V7a5 5 0 0 1 10 0v4"/><path pathLength=1 d="M6 11h12a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2Z"/></svg><h2>Private by design</h2><p>We collect nothing. Ever.</p></section>
-<div class=dots><i class=on></i><i></i><i></i><i></i></div><button id=skip>Skip</button></div>
+<div class=dots><i class=on></i><i></i><i></i><i></i></div></div>
 <div class=wel><h1>Choose your search.</h1><p class=sub>Choose how you search</p>
 <div class=seg><i class=ind></i><button class=on data-t=0>Search</button><button data-t=1>AI search</button></div>
 <p class=cap id=cap>Classic search engines</p>
@@ -342,13 +374,13 @@ function go3(){const h=document.getElementById('h3'),v=document.getElementById('
 function fit(){const k=Math.min(innerWidth/1280,innerHeight/720);st.style.transform='scale('+k+')'}fit();addEventListener('resize',fit);
 function txt(){if(!tx){tx=1;h.classList.add('txt')}}
 function end(){if(done)return;done=1;try{v.pause();v.removeAttribute('src');v.load()}catch(e){}h.classList.add('out');setTimeout(()=>h.remove(),650);window.introGo&&window.introGo()}
-v.addEventListener('timeupdate',()=>{if(v.currentTime>=4.6)txt()});v.addEventListener('ended',()=>{txt();setTimeout(end,2400)});v.addEventListener('error',end);h.addEventListener('click',end);
+v.addEventListener('timeupdate',()=>{if(v.currentTime>=4.6)txt()});v.addEventListener('ended',()=>{txt();setTimeout(end,2400)});v.addEventListener('error',end);
 v.__lbOk=true;if(v.dataset.s)v.src=v.dataset.s;const p=v.play();if(p&&p.catch)p.catch(end);setTimeout(end,16000)}
 function go2(){const h=document.getElementById('h2'),v=document.getElementById('h2v'),st=document.getElementById('h2s');let done=0,tx=0;
 function fit(){const k=Math.min(innerWidth/1344,innerHeight/768);st.style.transform='scale('+k+')'}fit();addEventListener('resize',fit);
 function txt(){if(!tx){tx=1;h.classList.add('txt')}}
 function end(){if(done)return;done=1;try{v.pause();v.removeAttribute('src');v.load()}catch(e){}h.classList.add('out');setTimeout(()=>h.remove(),650);go3()}
-v.addEventListener('timeupdate',()=>{if(v.currentTime>=4.2)txt()});v.addEventListener('ended',()=>{txt();setTimeout(end,2400)});v.addEventListener('error',end);h.addEventListener('click',end);
+v.addEventListener('timeupdate',()=>{if(v.currentTime>=4.2)txt()});v.addEventListener('ended',()=>{txt();setTimeout(end,2400)});v.addEventListener('error',end);
 v.__lbOk=true;if(v.dataset.s)v.src=v.dataset.s;const p=v.play();if(p&&p.catch)p.catch(end);setTimeout(end,14000)}
 (function(){if((navigator.hardwareConcurrency||4)<2||(navigator.deviceMemory||8)<1||matchMedia('(prefers-reduced-motion:reduce)').matches||!document.getElementById('hv').canPlayType('video/mp4; codecs="avc1.4D4028"')){['hero','h2','h3'].forEach(i=>{const e=document.getElementById(i);e&&e.remove()});return}
 const h=document.getElementById('hero'),v=document.getElementById('hv'),st=document.getElementById('hst');let done=0,tx=0;
@@ -357,14 +389,14 @@ function txt(){if(!tx){tx=1;h.classList.add('txt')}}
 function end(){if(done)return;done=1;try{v.pause();v.removeAttribute('src');v.load()}catch(e){}h.classList.add('out');setTimeout(()=>h.remove(),650);go2()}
 v.addEventListener('timeupdate',()=>{if(v.currentTime>=4.3)txt()});
 v.addEventListener('ended',()=>{txt();setTimeout(end,2200)});v.addEventListener('error',end);
-h.addEventListener('click',end);
+
 v.__lbOk=true;if(v.dataset.s)v.src=v.dataset.s;const p=v.play();if(p&&p.catch)p.catch(e=>{window.__he=e.name+':'+e.message;end()});
 setTimeout(end,12000)})();
 (function(){const ss=[...document.querySelectorAll('.sl')],ds=[...document.querySelectorAll('.dots i')],el=document.getElementById('intro');let i=0,t;
 function show(n){ss.forEach((s,k)=>s.classList.toggle('on',k===n));ds.forEach((d,k)=>d.classList.toggle('on',k===n))}
 function end(){clearInterval(t);el.classList.add('out');setTimeout(()=>el.remove(),500)}
 function next(){if(i>=ss.length-1){end();return}show(++i)}
-window.introGo=()=>{};el.addEventListener('click',e=>{if(e.target.id=='skip'){end();return}clearInterval(t);next();t=setInterval(next,2700)})})();
+window.introGo=()=>{clearInterval(t);t=setInterval(next,2700)};if(!document.getElementById('hero'))window.introGo()})();
 document.getElementById('done').addEventListener('click',()=>P('welcome.done',''));
 )HTML";
     return PageShell(L"Welcome", b, grey, js, L"", false, false);

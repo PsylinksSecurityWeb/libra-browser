@@ -4,6 +4,9 @@
 #include "Tab.h"
 #include "AdBlocker.h"
 #include "Data.h"
+#include "Sponsor.h"
+#include "Suggest.h"
+#include "AdRules.h"
 #include "Vault.h"
 #include <set>
 
@@ -102,6 +105,8 @@ private:
     void OnProbeDone(std::shared_ptr<DlJob> job, bool ok);
     void SyncJobs();
     void ClearData();
+    void AgWipe();   // assistant memory, permissions, sandbox files, counter; NEVER the API key
+    void WipeAll(int idx);
     // --- shield: blocked counter + per-site switch ---
     static std::wstring SiteOf(const std::wstring& host);
     int  ModeFor(const std::wstring& host) const; int ModeForRaw(const std::wstring& host) const;                       // 0 Max, 1 Balanced, 2 Off
@@ -116,11 +121,13 @@ private:
     void OnBlockedHit(const std::string& host);
     void ToggleShieldPopup();
     void HideShield();
-    RECT ShieldSegRect(int i) const;
+    RECT ShieldSegRect(int i) const; RECT ShieldKeepRect() const; std::set<std::wstring> m_keepId; void ToggleKeepId(); void AgTrackFrames(Tab* t); struct AgFr { wil::com_ptr<ICoreWebView2Frame2> f; int base; int n; }; std::vector<AgFr> m_agFr; int m_agMainN = 0;
+    void AgSnapFrames(Tab* t, unsigned gen, std::wstring acc, std::vector<wil::com_ptr<ICoreWebView2Frame2>> fr, size_t i, int total, std::vector<AgFr> got);
+    bool AgBtnOn() const { return m_set.Get(L"agent_btn", L"1") != L"0"; } bool KeepIdHere();
     int ShieldRows() const;   // top-blocked rows shown in the popup (0 = compact layout)
     int ShieldSelY() const;   // 96-dpi y of the Off/Balanced/Max selector
     void PaintShield(HDC hdc);
-    void DrawShieldIcon(HDC hdc, RECT rc, bool hot);
+    void DrawShieldIcon(HDC hdc, RECT rc, bool hot); void DrawAgentIcon(HDC hdc, RECT rc, bool open);
     static LRESULT CALLBACK ShieldProc(HWND, UINT, WPARAM, LPARAM);
     std::map<std::wstring, int> m_modes;       // site -> 0 Max, 1 Balanced, 2 Off
     unsigned long long m_totalBlocked = 0;
@@ -133,7 +140,7 @@ private:
     void StartSave(Tab* t, const std::wstring& url, const std::wstring& nameBase, const std::wstring& extHint, bool useTitle); void OnVideoProbe(std::shared_ptr<DlJob> job, bool ok);
     std::map<DlJob*, std::shared_ptr<DlJob>> m_vidJobs;
     void DlPush(); void ApplyMemoryLevels();
-    void InstallFpScript(Tab* t); unsigned m_fpSeed = 0; std::set<std::wstring> m_httpOk;
+    void InstallFpScript(Tab* t); unsigned m_fpSeed = 0; int m_fpDay = 0; std::set<std::wstring> m_httpOk;
     void PrivSendStats(Tab* t);
     void StatLoad(); void StatSave(); void PrivSendReport(Tab* t);
     std::map<std::pair<int, std::string>, int> m_stat; bool m_statDirty = false, m_statLoaded = false;   // (day yyyymmdd, host) -> blocked requests, kept 90 days in stats.txt
@@ -141,6 +148,10 @@ private:
     int m_fbAds = 0, m_fbTrk = 0;
     void PrivClear(Tab* t, const std::set<std::wstring>& keys, const std::wstring& range);
     void OnPrivPage(int idx, const std::vector<std::wstring>& v);
+    void OnAgentPage(int idx, const std::vector<std::wstring>& v); void AgentOnLlm(unsigned gen, const std::wstring& text); void AgSend(const std::wstring& js); void AgStop(const wchar_t* why); int AgTarget() const; void AgRunAct(int ti, const std::wstring& op, const std::wstring& id, const std::wstring& tx, bool ok);
+    void ToggleAgent(); void ApplyDock(); int AgDockIdx() const; bool m_agDock = false;
+    void AgFileHook(bool on); void AgFileChosen(void* p); void AgGoNow(); bool m_agPaused = false; bool AgAsk(const std::wstring& cat, const std::wstring& dom, const std::wstring& title, const std::wstring& detail, bool once); void AgClickCheck(); std::wstring m_agClickId, m_agFp; int m_agRetried = 0; std::wstring m_agAttach; std::wstring m_agTaskRaw; std::set<std::wstring> m_agTypeOk; int m_agFcN = 0; void VoiceCmd(const std::wstring& a, const std::wstring& b); void OnVoiceMsg(void* p); bool m_agConv = false; Tab* m_agHome = nullptr; Tab* m_agRes = nullptr; int m_agTabs = 0; void AgKeyChecked(const std::wstring& r); void AgClickNow(); int m_agClickX = 0, m_agClickY = 0; Tab* m_agClickTab = nullptr; int m_agTry = 0, m_agClickRid = 0; wil::com_ptr<ICoreWebView2Frame2> m_agClickFrame; void AgNextStrategy(); void AgExecT(const wchar_t* js, ICoreWebView2ExecuteScriptCompletedHandler* h); EventRegistrationToken m_agFcTok{}; Tab* m_agFcTab = nullptr; Tab* m_agGoTab = nullptr; std::wstring m_agTaskKey, m_agGoUrl;
+    bool m_agRun = false; unsigned m_agGen = 0; int m_agSteps = 0; DWORD m_agStart = 0; Tab* m_agTarget = nullptr; std::wstring m_agScope;   // Agent.inl
     void SetAsDefault();
     // --- passwords (Passwords.inl) ---
     std::vector<Cred> m_vault; bool m_vaultLoaded = false; std::set<std::wstring> m_pwNever;
@@ -189,12 +200,17 @@ private:
     void ShowError(Tab* t, int status);
     void SweepBlocked(const std::string& host);
     std::set<std::wstring> m_certAllow, m_certBad;   // hosts: user said proceed / certificate was refused
+    struct ErrPend { Tab* t; UINT64 nav; int st; }; std::vector<ErrPend> m_errPend;   // aborted loads wait a moment: a page that keeps redirecting is not an error
     Settings m_set;
     std::vector<HistoryItem> m_hist;
     std::vector<BookmarkItem> m_bm;
     std::vector<DownloadItem> m_dl;
     std::vector<std::wstring> m_closed;
     bool m_cleared = false;
+    // Auto suggest (Suggest.inl)
+    bool SgOn() const; void InstallSgScript(Tab* t); void SgSetting(); const std::vector<SgPair>& SgPairs(); void OnSiteSgMessage(Tab* t, const std::wstring& src, const std::wstring& msg); void ShowSg(); void HideSg(); void SgTick(); void SgClick(int what); void SgInsert(int i); void PaintSg(HDC hdc); int SgRowAt(POINT p) const; static LRESULT CALLBACK SgProc(HWND h, UINT msg, WPARAM wp, LPARAM lp);
+    HWND m_hSg = nullptr; std::vector<SgHit> m_sgHits; SgField m_sgField; Tab* m_sgTab = nullptr; std::wstring m_sgOrigin; int m_sgHot = -1, m_sgTestClick = 0; DWORD m_sgShown = 0, m_sgRate[2] = { 0, 0 }; RECT m_sgBox{}, m_sgWv{}; std::vector<SgPair> m_sgPairs; ULONGLONG m_sgStamp = 0; bool m_sgLoaded = false;
+    SpFeed m_sp; bool m_spBusy = false; bool SponsorOn() const; void SponsorLoad(); void SponsorKick(); void SponsorGot(void* r); void SponsorHide(const std::wstring& id); void SponsorHtml(std::wstring& tiles, std::wstring& bg);   // sponsored content (Sponsor.inl)
     static bool         IsUrl(const std::wstring& s);
 
     // â”€â”€â”€ Members â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -206,6 +222,7 @@ private:
     HWND       m_hBtnRefresh = nullptr;
     HWND       m_hBtnMenu    = nullptr;
     HWND       m_hBtnShield  = nullptr;
+    HWND       m_hBtnAgent   = nullptr;
     WNDPROC    m_origOmniboxProc = nullptr;
 
     std::vector<std::unique_ptr<Tab>> m_tabs;

@@ -43,6 +43,14 @@ inline std::wstring FromUtf8(const std::string& s) {
     return w;
 }
 
+// Test hooks (LIBRA_TEST_* environment variables) work ONLY when the file libra-test.enabled sits next to the exe. Release packages never contain it,
+// so a program that starts Libra with such variables cannot switch off a safety check or auto-answer a permission question.
+inline DWORD TestEnv(const wchar_t* name, wchar_t* buf, DWORD n) {
+    static int ok = -1;
+    if (ok < 0) { wchar_t p[MAX_PATH]; GetModuleFileNameW(nullptr, p, MAX_PATH); wchar_t* s = wcsrchr(p, L'\\'); if (s) { s[1] = 0; wcscat_s(p, L"libra-test.enabled"); } ok = GetFileAttributesW(p) != INVALID_FILE_ATTRIBUTES; }
+    if (!ok) { if (buf && n) buf[0] = 0; return 0; }
+    return GetEnvironmentVariableW(name, buf, n);
+}
 inline std::wstring DataDir() {
     wchar_t p[MAX_PATH] = {};
     GetEnvironmentVariableW(L"LOCALAPPDATA", p, MAX_PATH);
@@ -52,7 +60,7 @@ inline std::wstring DataDir() {
 }
 // Files that list where you have been are stored encrypted (Windows DPAPI, this Windows user only). Old plain files are read, then upgraded on the next write.
 inline bool IsSecretFile(const std::wstring& p) {
-    for (const wchar_t* n : { L"\\history.txt", L"\\dns.cache", L"\\stats.txt", L"\\session.txt", L"\\bookmarks.txt", L"\\sitemodes.txt", L"\\pinned.txt", L"\\tiles.txt", L"\\pwnever.txt", L"\\sites.txt" }) { size_t l = wcslen(n); if (p.size() > l && _wcsicmp(p.c_str() + p.size() - l, n) == 0) return true; }
+    for (const wchar_t* n : { L"\\history.txt", L"\\dns.cache", L"\\stats.txt", L"\\session.txt", L"\\bookmarks.txt", L"\\sitemodes.txt", L"\\keepid.txt", L"\\pinned.txt", L"\\tiles.txt", L"\\pwnever.txt", L"\\sites.txt", L"\\memory.dat", L"\\agent_perms.txt", L"\\spons.dat", L"\\sgnever.txt" }) { size_t l = wcslen(n); if (p.size() > l && _wcsicmp(p.c_str() + p.size() - l, n) == 0) return true; }
     return false;
 }
 inline std::string SecretChunk(const std::string& plain) {   // "LBE1" + length + DPAPI blob

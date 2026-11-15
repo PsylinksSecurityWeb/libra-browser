@@ -8,16 +8,22 @@ using std::max;
 #include "Pages.h"
 #include "PwPage.h"
 #include "PrivPage.h"
+#include "AgentPage.h"
 #include "PwSite.h"
 #include "Downloader.h"
 #include "WebView2EnvironmentOptions.h"
 #include "BrowserWindow.h"
 static bool CanUpgradeToHttps(const std::wstring& url);   // Fp.inl
+static std::wstring StripTrackers(const std::wstring& url);   // Fp.inl
+static int StatDay(int back);
 static HRESULT CreateController(ICoreWebView2Environment* env, ICoreWebView2Environment10* e10, ICoreWebView2ControllerOptions* o, HWND h, ICoreWebView2CreateCoreWebView2ControllerCompletedHandler* cb) {   // private tabs MUST use the options overload (in-memory profile)
     if (e10 && o) return e10->CreateCoreWebView2ControllerWithOptions(h, o, cb);
     return env->CreateCoreWebView2Controller(h, cb);
 }
-static std::wstring RegDom(const std::wstring& host) { size_t d = host.find_last_of(L'.'); if (d == std::wstring::npos || d == 0) return host; size_t p = host.find_last_of(L'.', d - 1); return p == std::wstring::npos ? host : host.substr(p + 1); }
+// Permission and navigation scopes use the exact hostname. Guessing the registrable
+// domain from the last two labels is unsafe for public suffixes such as github.io
+// and co.uk because unrelated sites could share a remembered permission.
+static std::wstring RegDom(const std::wstring& host) { std::wstring h = host; for (auto& c : h) c = (wchar_t)towlower(c); return h; }
 #include "Theme.h"
 #include "resource.h"
 struct HomeSugMsg { Tab* t; std::wstring q; std::vector<std::wstring> v; };
@@ -75,6 +81,7 @@ static void DrawLineAA(HDC hdc, float x1, float y1, float x2, float y2, COLORREF
     g.DrawLine(&pen, x1, y1, x2, y2);
 }
 
+static void PrivWipeCachesAtStart();   // Privacy.inl
 struct MenuIt { const wchar_t* n; const wchar_t* g; const wchar_t* u; };
 static const MenuIt kMenuIts[7] = { { L"History", L"\xE81C", L"libra://history" }, { L"Downloads", L"\xE896", L"libra://downloads" }, { L"Bookmarks", L"\xE734", L"libra://bookmarks" },
     { L"Passwords", L"\xE72E", L"libra://passwords" }, { L"Privacy", L"\xE7B3", L"libra://privacy" }, { L"Tabs", L"\xE7C4", L"libra://tabs" }, { L"Settings", L"\xE713", L"libra://settings" } };
@@ -288,7 +295,7 @@ bool BrowserWindow::Create(int nCmdShow) {
 
     CreateControls();
     m_set.Load();   // first run: no toolbar or tab strip may ever flash before the intro animation
-    if (!m_incognito && !m_set.On(L"welcomed")) { m_setup = true; for (HWND w : { m_hOmnibox, m_hBtnBack, m_hBtnFwd, m_hBtnRefresh, m_hBtnShield, m_hBtnMenu }) ShowWindow(w, SW_HIDE); }
+    if (!m_incognito && !m_set.On(L"welcomed")) { m_setup = true; for (HWND w : { m_hOmnibox, m_hBtnBack, m_hBtnFwd, m_hBtnRefresh, m_hBtnShield, m_hBtnAgent, m_hBtnMenu }) ShowWindow(w, SW_HIDE); }
     ShowWindow(m_hWnd, nCmdShow);
     UpdateWindow(m_hWnd);
 
@@ -338,8 +345,9 @@ bool BrowserWindow::Create(int nCmdShow) {
                         L" --no-pings --disable-component-update --disable-domain-reliability"
                         L" --disable-breakpad --disable-background-networking --disable-sync --disable-client-side-phishing-detection"
                         L" --disable-quic --disable-field-trial-config --autoplay-policy=document-user-activation-required"
+                        L" --force-webrtc-ip-handling-policy=default_public_interface_only --accept-lang=en-US"
                         + std::wstring(m_set.Get(L"block_3p", L"0") == L"1" ? L" --test-third-party-cookie-phaseout" : L"") +
-                        L" --disable-features=Translate,OptimizationHints,MediaRouter,AutofillServerCommunication,DialMediaRouteProvider";
+                        L" --disable-features=Translate,OptimizationHints,MediaRouter,AutofillServerCommunication,DialMediaRouteProvider,BrowsingTopics,PrivacySandboxAdsAPIs,AttributionReportingCrossAppWeb,InterestFeedContentSuggestions";
     {   // older / small PCs: fewer processes, smaller caches
         MEMORYSTATUSEX ms{ sizeof(ms) }; GlobalMemoryStatusEx(&ms); SYSTEM_INFO si; GetSystemInfo(&si);
         std::wstring pm = m_set.Get(L"perf", L"auto");
@@ -348,6 +356,7 @@ bool BrowserWindow::Create(int nCmdShow) {
     }
     envOpts->put_AdditionalBrowserArguments(args.c_str());
 
+    PrivWipeCachesAtStart();   // caches the owner asked to clear (GPU, shader, code) are removed before the engine opens them
     CreateCoreWebView2EnvironmentWithOptions(
         nullptr, userDataFolder.c_str(), envOpts.Get(),
         Microsoft::WRL::Callback<ICoreWebView2CreateCoreWebView2EnvironmentCompletedHandler>(
@@ -410,6 +419,7 @@ void BrowserWindow::CreateControls() {
     makeBtn(m_hBtnRefresh, 0, 0, IDC_BTN_REFRESH);
     makeBtn(m_hBtnMenu,    0, 0, IDC_BTN_MENU);
     makeBtn(m_hBtnShield,  0, 0, IDC_BTN_SHIELD);
+    makeBtn(m_hBtnAgent,   0, 0, IDC_BTN_AGENT);
     LayoutToolbar(W);
 }
 
@@ -423,7 +433,7 @@ RECT BrowserWindow::OmniPillRect() const {
     int omniH = MulDiv(Layout::OmniboxHeight,  m_dpi, 96);
     int gap   = MulDiv(2, m_dpi, 96);
     int left  = pad + (btnSz + gap) * 3 + MulDiv(8, m_dpi, 96);
-    int right = cr.right - pad - btnSz * 2 - gap - MulDiv(10, m_dpi, 96);
+    int right = cr.right - pad - (AgBtnOn() ? btnSz * 3 + gap * 2 : btnSz * 2 + gap) - MulDiv(10, m_dpi, 96);
     int top   = tabH + (toolH - omniH) / 2;
     return { left, top, std::max(left + 50, (int)right), top + omniH };
 }
@@ -440,6 +450,8 @@ void BrowserWindow::LayoutToolbar(int cx) {
     SetWindowPos(m_hBtnRefresh, nullptr, pad + (btnSz + gap) * 2, btnY, btnSz, btnSz, SWP_NOZORDER);
     SetWindowPos(m_hBtnMenu,    nullptr, cx - pad - btnSz,       btnY, btnSz, btnSz, SWP_NOZORDER);
     SetWindowPos(m_hBtnShield,  nullptr, cx - pad - btnSz * 2 - gap, btnY, btnSz, btnSz, SWP_NOZORDER);
+    SetWindowPos(m_hBtnAgent,   nullptr, cx - pad - btnSz * 3 - gap * 2, btnY, btnSz, btnSz, SWP_NOZORDER);
+    if (!AgBtnOn()) ShowWindow(m_hBtnAgent, SW_HIDE);
 
     RECT pill = OmniPillRect();
     int editH = MulDiv(20, m_dpi, 96);
@@ -465,6 +477,7 @@ void BrowserWindow::DrawNavButton(const DRAWITEMSTRUCT* dis) {
     if (pressed)      FillCircle(hdc, cx, cy, rad, Color::ButtonPress);
     else if (hover)   FillCircle(hdc, cx, cy, rad, Color::ButtonHover);
     if (dis->CtlID == IDC_BTN_SHIELD) { DrawShieldIcon(hdc, rc, hover || pressed); return; }
+    if (dis->CtlID == IDC_BTN_AGENT) { DrawAgentIcon(hdc, rc, AgDockIdx() >= 0); return; }
 
     const wchar_t* glyph = L"";
     switch (dis->CtlID) {
@@ -551,6 +564,7 @@ void BrowserWindow::InitWebView2(int tabIndex) {
                 // ─ Bounds ───────────────────────────────────────────────
                 ctrl->put_Bounds(wvRect);
                 ctrl->put_IsVisible(tabIndex == m_activeTab ? TRUE : FALSE);
+                if (m_agDock) PostMessage(m_hWnd, WM_APP + 32, 0, 0);   // agent sidebar: lay out once the view exists
 
                 if (!m_set.On(L"welcomed")) {   // first-run hero: files in the data folder, served from a virtual host (no network)
                     std::wstring hd = DataDir() + L"\\hero"; CreateDirectoryW(hd.c_str(), nullptr);
@@ -559,8 +573,11 @@ void BrowserWindow::InitWebView2(int tabIndex) {
                     wil::com_ptr<ICoreWebView2_3> w3; if (SUCCEEDED(t->webView->QueryInterface(IID_PPV_ARGS(&w3)))) w3->SetVirtualHostNameToFolderMapping(L"libra-hero.local", hd.c_str(), COREWEBVIEW2_HOST_RESOURCE_ACCESS_KIND_ALLOW);
                 }
                 // ─ Ad Blocker: intercept all network requests ────────────
-                if (m_adBlock || m_imagesOff) {   // otherwise every request would pay a UI-thread round trip for nothing
-                t->webView->AddWebResourceRequestedFilter(L"*", COREWEBVIEW2_WEB_RESOURCE_CONTEXT_ALL);
+                {   // bait scripts that only exist to show ads (ads.js, pagead.js...) are matched by file name: only those requests reach the handler below
+                static const wchar_t* bait[] = { L"*/ads.js*", L"*/pagead.js*", L"*/adsbygoogle.js*", L"*/show_ads.js*", L"*/show_ads_impl.js*", L"*/adsense.js*" };
+                if (m_adBlock || m_imagesOff) t->webView->AddWebResourceRequestedFilter(L"*", COREWEBVIEW2_WEB_RESOURCE_CONTEXT_ALL);   // otherwise every request would pay a UI-thread round trip for nothing
+                else for (auto b : bait) t->webView->AddWebResourceRequestedFilter(b, COREWEBVIEW2_WEB_RESOURCE_CONTEXT_SCRIPT);
+                for (auto& f : AdRuleFilters()) t->webView->AddWebResourceRequestedFilter(f.c_str(), COREWEBVIEW2_WEB_RESOURCE_CONTEXT_ALL);   // path rules (AdRules.h): only matching addresses reach the handler
                 t->webView->add_WebResourceRequested(
                     Microsoft::WRL::Callback<ICoreWebView2WebResourceRequestedEventHandler>(
                         [this](ICoreWebView2* wv, ICoreWebView2WebResourceRequestedEventArgs* args) -> HRESULT {
@@ -572,6 +589,35 @@ void BrowserWindow::InitWebView2(int tabIndex) {
                             COREWEBVIEW2_WEB_RESOURCE_CONTEXT ctx;
                             args->get_ResourceContext(&ctx);
 
+                            if (ctx == COREWEBVIEW2_WEB_RESOURCE_CONTEXT_SCRIPT && uri.get()) {   // bait script by file name: blocked in Max only
+                                std::wstring u = uri.get(); size_t q = u.find_first_of(L"?#"); if (q != std::wstring::npos) u.resize(q);
+                                size_t sl = u.find_last_of(L'/'); std::wstring fn = sl == std::wstring::npos ? u : u.substr(sl + 1);
+                                for (auto& ch : fn) ch = (wchar_t)towlower(ch);
+                                static const wchar_t* names[] = { L"ads.js", L"pagead.js", L"adsbygoogle.js", L"show_ads.js", L"show_ads_impl.js", L"adsense.js" };
+                                bool hit = false; for (auto n : names) if (fn == n) hit = true;
+                                wil::unique_cotaskmem_string src; wv->get_Source(&src);
+                                if (hit && src.get() && IsHttp(src.get()) && ModeFor(HostOf(src.get())) == 0) {
+                                    wil::com_ptr<ICoreWebView2WebResourceResponse> resp;
+                                    m_env->CreateWebResourceResponse(nullptr, 404, L"Blocked", L"", &resp);
+                                    args->put_Response(resp.get());
+                                    return S_OK;
+                                }
+                            }
+                            if (uri.get() && (ctx == COREWEBVIEW2_WEB_RESOURCE_CONTEXT_IMAGE || ctx == COREWEBVIEW2_WEB_RESOURCE_CONTEXT_MEDIA || ctx == COREWEBVIEW2_WEB_RESOURCE_CONTEXT_FETCH || ctx == COREWEBVIEW2_WEB_RESOURCE_CONTEXT_XML_HTTP_REQUEST || ctx == COREWEBVIEW2_WEB_RESOURCE_CONTEXT_OTHER)) {   // ads on the site's own server, refused by their address
+                                std::wstring rh, rp; AdSplitUrl(uri.get(), rh, rp);
+                                if (!rh.empty() && AdPathHit(rh, rp)) {
+                                    wil::unique_cotaskmem_string src; wv->get_Source(&src);
+                                    if (src.get() && IsHttp(src.get()) && ModeFor(HostOf(src.get())) == 0) {
+                                        wil::com_ptr<ICoreWebView2WebResourceResponse> resp;
+                                        m_env->CreateWebResourceResponse(nullptr, 404, L"Blocked", L"", &resp);
+                                        args->put_Response(resp.get());
+                                        OnBlockedHit(ToUtf8(rh));
+                                        AdTestLog(uri.get());   // tests only: every refused address
+                                        if (m_activeTab >= 0 && m_activeTab < (int)m_tabs.size() && IsHttp(m_tabs[m_activeTab]->url) && !DohProxy::AdLike(ToUtf8(rh))) ++m_tabs[m_activeTab]->blockedAds;   // counted as an ad, not a tracker
+                                        return S_OK;
+                                    }
+                                }
+                            }
                             // Image blocking
                             if (m_imagesOff && ctx == COREWEBVIEW2_WEB_RESOURCE_CONTEXT_IMAGE) {
                                 wil::com_ptr<ICoreWebView2WebResourceResponse> resp;
@@ -604,7 +650,7 @@ void BrowserWindow::InitWebView2(int tabIndex) {
                             if (uri.get()) {   // engine-internal and local-file pages (edge://settings, edge://flags, file:, view-source:, devtools:) are never opened as a page
                                 std::wstring sch(uri.get()); sch = sch.substr(0, sch.find(L':'));
                                 for (auto& ch : sch) ch = (wchar_t)towlower(ch);
-                                static const wchar_t* bad[] = { L"file", L"ftp", L"edge", L"chrome", L"devtools", L"view-source", L"chrome-extension", L"chrome-untrusted", L"edge-extension" };
+                                static const wchar_t* bad[] = { L"file", L"ftp", L"edge", L"chrome", L"devtools", L"view-source", L"chrome-extension", L"chrome-untrusted", L"edge-extension", L"libra" };   // a website can never "navigate" a tab to one of our own pages
                                 for (auto b : bad) if (sch == b) { args->put_Cancel(TRUE); t2->loading = false; return S_OK; }
                             }
                             if (uri.get() && m_set.Get(L"https_upgrade", L"1") != L"0" && CanUpgradeToHttps(uri.get())) {   // http -> https first
@@ -614,7 +660,11 @@ void BrowserWindow::InitWebView2(int tabIndex) {
                                     else { t2->upHost = host; t2->upTick = now; t2->upUrl = L"https://" + std::wstring(uri.get()).substr(7); args->put_Cancel(TRUE); PostMessage(m_hWnd, WM_APP + 7, 0, (LPARAM)t2); return S_OK; }
                                 }
                             }
-                            if (!IsInternalUri(uri.get())) { if (HostOf(uri.get()) != HostOf(t2->url)) t2->fav.reset(); t2->prevUrl = t2->url; t2->dlNav = false; t2->url = uri.get(); }
+                            if (uri.get() && IsHttp(uri.get()) && m_set.Get(L"fingerprint", L"1") != L"0" && ModeFor(HostOf(uri.get())) != 2) {   // tracking parameters never leave the PC
+                                std::wstring cl = StripTrackers(uri.get());
+                                if (!cl.empty()) { t2->upUrl = cl; args->put_Cancel(TRUE); PostMessage(m_hWnd, WM_APP + 7, 0, (LPARAM)t2); return S_OK; }
+                            }
+                            /* only real web addresses ever become the tab address: otherwise a page could pose as libra://agent and receive its data */ if (!IsInternalUri(uri.get()) && IsHttp(uri.get())) { if (HostOf(uri.get()) != HostOf(t2->url)) t2->fav.reset(); t2->prevUrl = t2->url; t2->dlNav = false; t2->url = uri.get(); }
                             if (!IsInternalUri(uri.get())) { t2->vids.clear(); t2->blockedReq = 0; t2->blockedAds = 0; t2->letThrough = 0; t2->blockedHosts.clear(); if (tabIndex == m_activeTab) DohProxy::Get().SetNonce(GetTickCount() * 2654435761u); }   // new page: counters restart, a new set of ads gets through
                             if (tabIndex == m_activeTab) {
                                 UpdateOmniboxText(t2->url);
@@ -649,13 +699,12 @@ void BrowserWindow::InitWebView2(int tabIndex) {
                                 COREWEBVIEW2_WEB_ERROR_STATUS es; args->get_WebErrorStatus(&es);
                                 int st = (int)es;
                                 int hs = -1; { wil::com_ptr<ICoreWebView2NavigationCompletedEventArgs2> a2; if (SUCCEEDED(args->QueryInterface(IID_PPV_ARGS(&a2)))) a2->get_HttpStatusCode(&hs); }
-                                if (es == COREWEBVIEW2_WEB_ERROR_STATUS_UNKNOWN && hs >= 400 && hs < 600 && !DohProxy::Get().IsBlocked(ToUtf8(HostOf(t2->url))) && !DohProxy::Get().DnsFailed(ToUtf8(HostOf(t2->url)))) { t2->url = uri.get(); st = -1; }   // a real page with an HTTP error (Google's CAPTCHA is a 429): show it, it is not "unreachable"
+                                if (es == COREWEBVIEW2_WEB_ERROR_STATUS_UNKNOWN && hs >= 400 && hs < 1000 && !DohProxy::Get().IsBlocked(ToUtf8(HostOf(t2->url))) && !DohProxy::Get().DnsFailed(ToUtf8(HostOf(t2->url)))) { t2->url = uri.get(); st = -1; }   // a real page with an HTTP error (Google's CAPTCHA is a 429): show it, it is not "unreachable"
                                 if (st >= 0 && m_certBad.erase(HostOf(t2->url))) st = 2;                // we refused its certificate
                                 if (st >= 0 && st != (int)COREWEBVIEW2_WEB_ERROR_STATUS_OPERATION_CANCELED)
                                     PostMessage(m_hWnd, WM_APP + 2, (WPARAM)st, (LPARAM)t2);   // show after this event returns
                             }
                             if (navOk && !internal && !(t2->incognito || m_incognito)) {
-                                RecordVisit(HostOf(t2->url));
                                 wil::unique_cotaskmem_string ttl; wv->get_DocumentTitle(&ttl);
                                 RecordHistory(t2->url, ttl.get() ? ttl.get() : L"");
                             }
@@ -694,9 +743,11 @@ void BrowserWindow::InitWebView2(int tabIndex) {
                             if (!userClick) return S_OK;   // popup blocker: pages cannot open windows without a real click/tap
                             wil::unique_cotaskmem_string uri;
                             args->get_Uri(&uri);
+                            if (!uri.get() || !IsHttp(uri.get())) return S_OK;   // a website may open websites only, never libra:// pages, file:, data: or javascript:
                             OpenTab(uri.get());
                             return S_OK;
                         }).Get(), &t->tokNewWindow);
+                AgTrackFrames(t);
 
                 {
                     EventRegistrationToken tkf;
@@ -750,6 +801,7 @@ void BrowserWindow::InitWebView2(int tabIndex) {
                                 if (src.get() && IsHttp(src.get())) {   // a real website: only the narrow pw.* channel, about its own origin
                                     std::wstring m = msg.get();
                                     if (m.size() < 3000 && m.rfind(L"pw.", 0) == 0) OnSitePwMessage(tp, src.get(), m);
+                                    else if (m.size() < 3000 && m.rfind(L"sg.", 0) == 0) OnSiteSgMessage(tp, src.get(), m);
                                     return S_OK;
                                 }
                                 if (tp->url.rfind(L"libra://", 0) != 0) return S_OK;   // internal pages only
@@ -784,7 +836,7 @@ void BrowserWindow::InitWebView2(int tabIndex) {
                                 }).Get(), &tkc);
                 }
 
-                InstallPwScript(t); AttachVideoSniff(t); AttachContextSave(t);   // password generator card + save/fill triggers
+                InstallPwScript(t); InstallSgScript(t); AttachVideoSniff(t); AttachContextSave(t);   // password generator card + save/fill triggers
                 InstallAdScript(t);   // remove empty ad boxes (skipped on sites where blocking is off)
 
                 // ─ Favicons for the start-page shortcuts (never for private tabs) ─
@@ -827,7 +879,6 @@ void BrowserWindow::InitWebView2(int tabIndex) {
                                                 if (!CryptBinaryToStringA((const BYTE*)bytes.data(), (DWORD)bytes.size(),
                                                         CRYPT_STRING_BASE64 | CRYPT_STRING_NOCRLF, b64.data(), &len)) return S_OK;
                                                 b64.resize(len);
-                                                RecordVisit(host, b64);
                                                 return S_OK;
                                             }).Get());
                                     return S_OK;
@@ -902,33 +953,19 @@ std::wstring BrowserWindow::GetHomepageHtml() {
   .ico{width:34px;height:34px;display:grid;place-items:center;font-size:14px;font-weight:600;background:#f0f0f0;border-radius:50%}
   .ico img{width:22px;height:22px;object-fit:contain}
   .site span{font-size:12px;max-width:88px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .foot{position:fixed;bottom:18px;font-size:11px;color:var(--mute);letter-spacing:.04em}
+  .tw.sp .site{border:1px dashed #d4d4d4}.spl{font-style:normal;font-size:10px;color:var(--mute);letter-spacing:.04em}.spx{position:absolute;top:2px;right:2px;z-index:2;width:24px;height:24px;border-radius:50%;border:0;background:transparent;color:#777;font-size:16px;cursor:pointer;opacity:0;transition:opacity .15s}.tw.sp:hover .spx{opacity:1}.spx:hover{background:#e8e8e8}
+  .spbg{position:fixed;inset:0;z-index:-1;background-size:cover;background-position:center}.spbg::after{content:"";position:absolute;inset:0;background:rgba(255,255,255,.62)}
+  .spill{position:fixed;left:18px;bottom:18px;display:flex;gap:10px;align-items:center;background:#fff;border:1px solid #e6e6e6;border-radius:99px;padding:6px 8px 6px 14px;font-size:12px}.spill a{color:#111;font-weight:600}.spill button{border:0;background:#f3f3f3;border-radius:99px;padding:4px 10px;font:inherit;cursor:pointer}
+  .spoff{position:fixed;right:18px;bottom:18px;font-size:11px;color:var(--mute)}
 </style></head>
-<body>
-<div class="logo">LIBRA</div>
+<body>@SPBG@
+<div class="logo">LIBRA<sup style="font:700 11px 'Segoe UI',sans-serif;letter-spacing:.1em;border:1px solid #111;border-radius:99px;padding:2px 8px;margin-left:10px;vertical-align:34px;display:inline-block">BETA</sup></div>
 <form class="search" action="https://www.google.com/search" method="GET" target="_self">
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
     <circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
   <input name="q" placeholder="Search or type a URL" autofocus autocomplete="off" spellcheck="false">
 </form>
 <div class="sg" id="sg" hidden></div>
-<div class="dlg" id="dlg" hidden><div class="box"><h3>Edit shortcut</h3><label>Name</label><input id="dn" maxlength="40" autocomplete="off"><label>Address</label><input id="du" maxlength="500" autocomplete="off" spellcheck="false"><div class="bt"><button id="dcancel">Cancel</button><button id="dsave" class="pri">Save</button></div></div></div>
-<script>
-(function(){const dlg=document.getElementById('dlg'),dn=document.getElementById('dn'),du=document.getElementById('du'),P=m=>chrome.webview.postMessage(m);
-function closeM(){document.querySelectorAll('.tm').forEach(m=>m.remove())}
-function act(k,w){const h=w.dataset.h,a=w.querySelector('a');
- if(k==='open')window.open(a.href,'_blank');
- else if(k==='del')P('home.del\t'+h);
- else{dn.value=w.dataset.n;du.value=a.href;dlg.hidden=false;dn.focus();document.getElementById('dsave').onclick=()=>{P('home.edit\t'+h+'\t'+dn.value+'\t'+du.value);dlg.hidden=true}}}
-document.addEventListener('click',e=>{const b=e.target.closest('.dots');
- if(!b){if(!e.target.closest('.tm'))closeM();return}
- e.preventDefault();const w=b.closest('.tw'),had=w.querySelector('.tm');closeM();if(had)return;
- const m=document.createElement('div');m.className='tm';
- [['Open in new tab','open'],['Edit','edit'],['Remove','del']].forEach(([t,k])=>{const x=document.createElement('button');x.textContent=t;if(k==='del')x.className='del';x.onclick=ev=>{ev.stopPropagation();closeM();act(k,w)};m.appendChild(x)});
- w.appendChild(m)});
-document.getElementById('dcancel').onclick=()=>dlg.hidden=true;
-document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeM();dlg.hidden=true}else if(e.key==='Enter'&&!dlg.hidden)document.getElementById('dsave').click()})})();
-</script>
 <script>
 (function(){const q=document.querySelector('input[name=q]'),sg=document.getElementById('sg');let t,sel=-1,typed='';
 function show(a,v){if(q.value.trim()!==v)return;sg.textContent='';sel=-1;a.forEach(s=>{const d=document.createElement('div');d.textContent=s;d.onmousedown=e=>{e.preventDefault();q.value=s;q.form.submit()};sg.appendChild(d)});sg.hidden=!a.length}
@@ -940,7 +977,6 @@ q.addEventListener('keydown',e=>{const k=[...sg.children];if(sg.hidden||!k.lengt
 q.addEventListener('blur',()=>setTimeout(()=>sg.hidden=true,120))})();
 </script>
 @SITES@
-<div class="foot">Cloud ad blocking &middot; Built by Psylinks Security Private Limited</div>
 </body></html>)html";
 
     {   // search form uses the chosen engine
@@ -965,28 +1001,8 @@ q.addEventListener('blur',()=>setTimeout(()=>sg.hidden=true,120))})();
         ? L"--bg:#d9d9d9;--fg:#111;--mute:#7a7a7a"
         : L"--bg:#fff;--fg:#111;--mute:#8a8a8a");
 
-    // Up to 5 most recently visited sites (hosts and icons are validated on load/record)
-    std::wstring sites;
-    if (!m_incognito && !m_sites.empty()) {
-        sites = L"<div class=\"sites\">";
-        for (auto& s : m_sites) {
-            std::wstring name = s.first.rfind(L"www.", 0) == 0 ? s.first.substr(4) : s.first, href = L"https://" + s.first;
-            auto mt = m_tileMeta.find(s.first);
-            if (mt != m_tileMeta.end()) { if (!mt->second.first.empty()) name = mt->second.first; href = mt->second.second; }
-            std::wstring letter(1, (wchar_t)towupper(name.empty() ? L'?' : name[0]));
-            sites += L"<div class=\"tw\" data-h=\"" + Esc(s.first) + L"\" data-n=\"" + Esc(name) + L"\"><button class=\"dots\" aria-label=\"Options\">&#8943;</button>";
-            sites += L"<a class=\"site\" href=\"" + Esc(href) + L"\"><div class=\"ico\">";
-            if (!s.second.empty())
-                sites += L"<img alt=\"\" src=\"data:image/png;base64," + FromUtf8(s.second) + L"\">";
-            else {   // no icon: letter on a soft colour taken from the name
-                unsigned hh = 5381; for (wchar_t c : name) hh = hh * 33 + c; int hue = hh % 360;
-                sites.insert(sites.size() - 1, L" style=\"background:hsl(" + std::to_wstring(hue) + L",70%,92%);color:hsl(" + std::to_wstring(hue) + L",55%,32%)\"");
-                sites += letter;
-            }
-            sites += L"</div><span>" + Esc(name) + L"</span></a></div>";
-        }
-        sites += L"</div>";
-    }
+    std::wstring sites;   // only sponsored tiles (if any) go in this row; Libra no longer makes shortcuts by itself
+    { std::wstring spT, spB; SponsorHtml(spT, spB); if (!spT.empty()) { if (sites.size() > 6 && sites.compare(sites.size() - 6, 6, L"</div>") == 0 && sites.rfind(L"<div class=\"sites\">", 0) == 0) sites.insert(sites.size() - 6, spT); else sites = L"<div class=\"sites\">" + spT + L"</div>"; } replaceAll(L"@SPBG@", spB); }
     if (!m_incognito && m_totalBlocked > 0) sites += L"<div class=\"prot\"><b>" + std::to_wstring(m_totalBlocked) + L"</b> ads and trackers blocked so far</div>";
     replaceAll(L"@SITES@", sites);
     return html;
@@ -1024,6 +1040,7 @@ void BrowserWindow::CloseTab(int index) {
     if (index < 0 || index >= (int)m_tabs.size()) return;
     // Unregister events & close controller
     Tab* t = m_tabs[index].get();
+    if (t->url == L"libra://agent") { AgStop(nullptr); m_agDock = false; }   // however the assistant is closed (button, tab X, shortcut), everything it was doing stops
     if (!t->incognito && !m_incognito && IsHttp(t->url)) { m_closed.push_back(t->url); if (m_closed.size() > 20) m_closed.erase(m_closed.begin()); }
     if (t->webView) {
         t->webView->remove_NavigationStarting(t->tokNavStart);
@@ -1074,6 +1091,7 @@ void BrowserWindow::SwitchTab(int index) {
     SetWindowTextW(m_hWnd, title.c_str());
     m_progressVisible = t->loading;
     m_displayProgress = t->progress;
+    if (m_agDock) ApplyDock();
     InvalidateRect(m_hWnd, nullptr, FALSE);
 }
 
@@ -1103,7 +1121,7 @@ std::wstring BrowserWindow::SmartUrl(const std::wstring& in0) const {
     if (in.empty()) return L"libra://home";
     if (in == L"about:blank") return in;
     if (in.rfind(L"libra://", 0) == 0) {
-        for (const wchar_t* pg : { L"libra://home", L"libra://tabs", L"libra://settings", L"libra://history", L"libra://bookmarks", L"libra://downloads", L"libra://passwords", L"libra://privacy", L"libra://welcome" })
+        for (const wchar_t* pg : { L"libra://home", L"libra://tabs", L"libra://settings", L"libra://history", L"libra://bookmarks", L"libra://downloads", L"libra://passwords", L"libra://privacy", L"libra://agent", L"libra://welcome" })
             if (in == pg) return in;
         return L"libra://home";
     }
@@ -1163,10 +1181,12 @@ RECT BrowserWindow::WebViewRect() const {
 }
 
 void BrowserWindow::ResizeWebViews() {
-    RECT wvRect = WebViewRect();
+    RECT wvRect = WebViewRect(), pan = wvRect;
+    const int ai = AgDockIdx(); const bool dock = ai >= 0 && ai != m_activeTab;   // agent sidebar: right strip, other tabs shrink
+    if (dock) { int w = std::min<int>(MulDiv(400, m_dpi, 96), (wvRect.right - wvRect.left) / 2); wvRect.right -= w; pan.left = pan.right - w; }
     for (int i = 0; i < (int)m_tabs.size(); ++i)
         if (m_tabs[i]->controller)
-            m_tabs[i]->controller->put_Bounds(wvRect);
+            m_tabs[i]->controller->put_Bounds(dock && i == ai ? pan : wvRect);
 }
 
 RECT BrowserWindow::TabRect(int index) const {
@@ -1368,6 +1388,7 @@ void BrowserWindow::PaintToolbar(HDC hdc, const RECT& r) {
 }
 
 void BrowserWindow::PaintProgressBar(HDC hdc, const RECT& toolbarRect) {
+    if (m_activeTab >= 0 && m_activeTab < (int)m_tabs.size() && m_tabs[m_activeTab]->url.rfind(L"libra://", 0) == 0) return;   // no loading bar on our own pages
     if (!m_progressVisible || m_displayProgress <= 0.f) return;
     int barH = MulDiv(3, m_dpi, 96);
     int barY = toolbarRect.bottom - barH;
@@ -1476,6 +1497,13 @@ LRESULT CALLBACK BrowserWindow::WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPAR
         return 0;
     }
     case WM_APP + 30: bw->OnWinAuth((int)wParam, (int)lParam); return 0;   // Windows sign-in answered
+    case WM_APP + 32: bw->ApplyDock(); return 0;
+    case WM_APP + 33: bw->ToggleAgent(); return 0;
+    case WM_APP + 34: bw->AgFileChosen((void*)lParam); return 0;
+    case WM_APP + 36: bw->OnVoiceMsg((void*)lParam); return 0;
+    case WM_APP + 37: bw->SponsorGot((void*)lParam); return 0;
+    case WM_APP + 35: { std::unique_ptr<std::wstring> s((std::wstring*)lParam); bw->AgKeyChecked(*s); return 0; }
+    case WM_APP + 31: { std::unique_ptr<std::wstring> s((std::wstring*)lParam); bw->AgentOnLlm((unsigned)wParam, *s); return 0; }   // agent: model reply
     case WM_APP + 20: {   // web suggestions arrived (ignored when the text changed since)
         std::unique_ptr<std::vector<std::wstring>> v((std::vector<std::wstring>*)lParam);
         if ((unsigned)wParam != bw->m_sugGen || GetFocus() != bw->m_hOmnibox) return 0;
@@ -1499,7 +1527,10 @@ LRESULT CALLBACK BrowserWindow::WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPAR
         return 0;
     case WM_APP + 2:
         for (auto& tb : bw->m_tabs)
-            if ((LPARAM)tb.get() == lParam) { bw->ShowError(tb.get(), (int)wParam); break; }
+            if ((LPARAM)tb.get() == lParam) {
+                if (wParam == 9 || wParam == 10) { bw->m_errPend.push_back({ tb.get(), tb->navId, (int)wParam }); SetTimer(hWnd, 2030, 2500, nullptr); }   // "aborted": login redirects often abort and retry
+                else bw->ShowError(tb.get(), (int)wParam);
+                break; }
         return 0;
     case WM_APP + 1: {
         std::unique_ptr<std::string> h((std::string*)lParam);
@@ -1642,15 +1673,17 @@ void BrowserWindow::OnCommand(WPARAM wParam, LPARAM lParam) {
         static HBRUSH white = CreateSolidBrush(RGB(255, 255, 255));
         MENUINFO mi{ sizeof(mi), MIM_BACKGROUND | MIM_STYLE, MNS_NOCHECK, 0, white, 0, 0 }; SetMenuInfo(m, &mi);
         for (int k = 0; k < 7; ++k) {
+            if (k == 4 || k == 5) continue;   // Privacy and Tabs live elsewhere
             if (k == 6) AppendMenuW(m, MF_OWNERDRAW | MF_SEPARATOR, 0, nullptr);
             AppendMenuW(m, MF_OWNERDRAW, 9100 + k, (LPCWSTR)&kMenuIts[k]);
         }
         RECT br; GetWindowRect(m_hBtnMenu, &br);
         int pick = TrackPopupMenu(m, TPM_RETURNCMD | TPM_RIGHTALIGN | TPM_TOPALIGN, br.right, br.bottom + 4, 0, m_hWnd, nullptr);
         DestroyMenu(m);
-        if (pick >= 9100 && pick < 9107) ShowInternal(kMenuIts[pick - 9100].u);
+        if (pick >= 9100 && pick < 9107) { if (std::wstring(kMenuIts[pick - 9100].u) == L"libra://agent") ToggleAgent(); else ShowInternal(kMenuIts[pick - 9100].u); }
         break; }
     case IDC_BTN_SHIELD:       ToggleShieldPopup(); break;
+    case IDC_BTN_AGENT:        ToggleAgent(); break;
     }
 }
 
@@ -1686,6 +1719,15 @@ void BrowserWindow::OnTimer(UINT_PTR id) {
     if (id == 2003) { PwClipClear(); return; }
     if (id == 2004) { KillTimer(m_hWnd, 2004); FirstBlock(); return; }
     if (id == 2005) { DlPush(); return; }
+    if (id == 2031) {   // a new local day: every tab gets the new identity script
+        if (m_fpDay && StatDay(0) != m_fpDay) for (auto& tb : m_tabs) InstallFpScript(tb.get());
+        return;
+    }
+    if (id == 2030) {   // delayed "aborted" errors: show only if nothing newer started or loaded
+        KillTimer(m_hWnd, 2030); auto pend = m_errPend; m_errPend.clear();
+        for (auto& e : pend) { if (IndexOf(e.t) < 0 || e.t->navId != e.nav || e.t->loading) continue; ShowError(e.t, e.st); }
+        return;
+    }
     if (id == 2012) {   // toast slide in / out
         if (!m_hPw || !(m_pwKind == 3 || m_pwKind == 6)) { KillTimer(m_hWnd, 2012); return; }
         if (m_pwAnim == 1) { m_pwSl -= std::max(2, m_pwSl / 5); if (m_pwSl <= 0) { m_pwSl = 0; m_pwAnim = 0; KillTimer(m_hWnd, 2012); } }
@@ -1695,14 +1737,20 @@ void BrowserWindow::OnTimer(UINT_PTR id) {
         InvalidateRect(m_hPw, nullptr, FALSE); return;
     }
     if (id == 2006) { ApplyMemoryLevels(); return; }
+    if (id == 2041) { SgTick(); return; }
+    if (id == 2042) { KillTimer(m_hWnd, 2042); SgClick(m_sgTestClick); return; }
+    if (id == 2040) { SetTimer(m_hWnd, 2040, 6 * 3600 * 1000, nullptr); SponsorKick(); return; }
     if (id == 2010) { KillTimer(m_hWnd, 2010); FetchWebSug(m_sugQ); return; }
+    if (id == 2020) { KillTimer(m_hWnd, 2020); AgGoNow(); return; }
+    if (id == 2021) { KillTimer(m_hWnd, 2021); AgClickNow(); return; }
+    if (id == 2022) { KillTimer(m_hWnd, 2022); AgClickCheck(); return; }
     if (id != TIMER_PROGRESS) return;
 
     // Hover tracking for the owner-draw toolbar buttons
     {
         POINT pt; GetCursorPos(&pt);
         HWND under = nullptr;
-        for (HWND b : { m_hBtnBack, m_hBtnFwd, m_hBtnRefresh, m_hBtnShield, m_hBtnMenu }) {
+        for (HWND b : { m_hBtnBack, m_hBtnFwd, m_hBtnRefresh, m_hBtnShield, m_hBtnAgent, m_hBtnMenu }) {
             RECT br; GetWindowRect(b, &br);
             if (PtInRect(&br, pt)) { under = b; break; }
         }
@@ -1780,6 +1828,8 @@ void BrowserWindow::OnTimer(UINT_PTR id) {
 }
 
 void BrowserWindow::OnClose() {
+    Verdicts::Get().Save();
+    { wchar_t tf[MAX_PATH]; if (TestEnv(L"LIBRA_TEST_VLOG", tf, MAX_PATH)) { std::string o = "local=" + std::to_string(Verdicts::Get().localHits.load()) + " cloud=" + std::to_string(Verdicts::Get().cloudAsks.load()) + " table=" + std::to_string(Verdicts::Get().Count()) + "\n"; WriteAllRaw(tf, o, true); } }   // test hook only
     PwClipClear();
     if (m_statDirty) StatSave();
     if (m_totalDirty) { m_set.Set(L"blocked_total", std::to_wstring(m_totalBlocked)); m_totalDirty = false; }
@@ -1812,6 +1862,7 @@ void BrowserWindow::LoadData() {
     m_imagesOff = m_set.On(L"block_images");
     m_totalBlocked = (unsigned long long)_wtoi64(m_set.Get(L"blocked_total", L"0").c_str());
     for (auto& l : Lines(ReadAll(DataDir() + L"\\sitemodes.txt"))) { auto f = SplitTab(l); if (f.size() == 2 && f[0].size() < 120) { int m = _wtoi(f[1].c_str()); if (m >= 0 && m <= 2) m_modes[f[0]] = m; } }
+    for (auto& l : Lines(ReadAll(DataDir() + L"\\keepid.txt"))) if (!l.empty() && l.size() < 120) m_keepId.insert(l);
     for (auto& l : Lines(ReadAll(DataDir() + L"\\history.txt"))) {
         auto f = SplitTab(l);
         if (f.size() >= 2) m_hist.push_back({ _wtoi64(f[0].c_str()), f[1], f.size() > 2 ? f[2] : L"" });
@@ -1877,6 +1928,7 @@ std::wstring BrowserWindow::PageHtml(const std::wstring& url) {
     if (url == L"libra://downloads") { SyncJobs(); return DownloadsPage(m_dl, g); }
     if (url == L"libra://welcome")   return WelcomePage(g, IsDefaultBrowser());
     if (url == L"libra://privacy")   return PrivacyPage(g, IsDefaultBrowser());
+    if (url == L"libra://agent")     return AgentPage(g);
     return GetHomepageHtml();
 }
 void BrowserWindow::RenderTab(int idx) {
@@ -1905,14 +1957,21 @@ void BrowserWindow::ShowInternal(const std::wstring& url, bool activate) {
     if (!activate && prev >= 0) SwitchTab(prev);
 }
 
+static void CALLBACK LbMenuEvt(HWINEVENTHOOK, DWORD, HWND h, LONG, LONG, DWORD, DWORD) {   // menus without the system drop shadow (it does not match our flat look)
+    char cls[16] = {}; if (!h || !GetClassNameA(h, cls, 16) || strcmp(cls, "#32768") != 0) return;
+    LONG_PTR st = GetClassLongPtr(h, GCL_STYLE); if (st & CS_DROPSHADOW) { SetClassLongPtr(h, GCL_STYLE, st & ~(LONG_PTR)CS_DROPSHADOW); ShowWindow(h, SW_HIDE); ShowWindow(h, SW_SHOWNA); }
+}
 void BrowserWindow::StartupTabs() {
+    static HWINEVENTHOOK s_mh = SetWinEventHook(EVENT_SYSTEM_MENUPOPUPSTART, EVENT_SYSTEM_MENUPOPUPSTART, nullptr, LbMenuEvt, GetCurrentProcessId(), 0, WINEVENT_OUTOFCONTEXT); (void)s_mh;
     { std::random_device rd; m_fpSeed = rd(); }   // new fingerprint noise every launch
+    SetTimer(m_hWnd, 2031, 300000, nullptr);   // new day -> new fingerprint identity
     SetTimer(m_hWnd, 2006, 4000, nullptr);   // background tabs keep a small memory footprint
+    SponsorLoad(); { wchar_t sf[8]; SetTimer(m_hWnd, 2040, TestEnv(L"LIBRA_TEST_SPFEED", sf, 8) ? 1500 : 30000, nullptr); }   // sponsored feed: cached copy now, a daily fetch soon after start
     int np = 0;
     if (!m_incognito)
         for (auto& u : Lines(ReadAll(DataDir() + L"\\pinned.txt")))
             if (IsHttp(u) && np < 12) { OpenTab(u); m_tabs.back()->pinned = true; ++np; }
-    if (!m_set.On(L"welcomed")) { m_setup = true; for (HWND w : { m_hOmnibox, m_hBtnBack, m_hBtnFwd, m_hBtnRefresh, m_hBtnShield, m_hBtnMenu }) ShowWindow(w, SW_HIDE); OpenTab(L"libra://welcome"); ResizeWebViews(); return; }
+    if (!m_set.On(L"welcomed")) { m_setup = true; for (HWND w : { m_hOmnibox, m_hBtnBack, m_hBtnFwd, m_hBtnRefresh, m_hBtnShield, m_hBtnAgent, m_hBtnMenu }) ShowWindow(w, SW_HIDE); OpenTab(L"libra://welcome"); ResizeWebViews(); return; }
     std::wstring st = m_set.Get(L"startup", L"home"), hp = m_set.Get(L"homepage");
     if (st == L"url" && IsHttp(hp)) { OpenTab(hp); return; }
     if (st == L"last" && !m_incognito) {
@@ -1920,6 +1979,9 @@ void BrowserWindow::StartupTabs() {
         for (auto& u : Lines(ReadAll(DataDir() + L"\\session.txt"))) if (IsHttp(u) && n++ < 20) OpenTab(u);
         if (n) { m_activeTab = np; return; }
     }
+    { wchar_t to[32]; if (TestEnv(L"LIBRA_TEST_OPEN", to, 32) && wcsncmp(to, L"settings", 8) == 0) { OpenTab(L"libra://settings"); return; }
+      if (TestEnv(L"LIBRA_TEST_OPEN", to, 32) && wcscmp(to, L"history") == 0) OpenTab(L"libra://history");
+      if (TestEnv(L"LIBRA_TEST_OPEN", to, 32) && wcscmp(to, L"privacy") == 0) OpenTab(L"libra://privacy"); }   // test hook only
     OpenTab(L"libra://home");
 }
 
@@ -1942,6 +2004,7 @@ bool BrowserWindow::HandleKey(UINT vk) {
     case 'A': if (!shift) return false; ShowInternal(L"libra://tabs"); return true;
     case 'P': if (!shift) return false; TogglePin(m_activeTab); return true;
     case 'O': if (!shift) return false; ShowInternal(L"libra://bookmarks"); return true;
+    case VK_SPACE: if (!shift) return false; ToggleAgent(); return true;   // agent sidebar
     case 'L': SetFocus(m_hOmnibox); SendMessage(m_hOmnibox, EM_SETSEL, 0, -1); return true;
     case VK_TAB: {
         int n = (int)m_tabs.size();
@@ -2141,6 +2204,7 @@ void BrowserWindow::OnPageMessage(int idx, const std::wstring& msg) {
 
     if (c.rfind(L"pw.", 0) == 0) { OnPwPage(idx, v); return; }
     if (c.rfind(L"priv.", 0) == 0) { OnPrivPage(idx, v); return; }
+    if (c.rfind(L"agent.", 0) == 0) { OnAgentPage(idx, v); return; }
     if (c == L"home.del") {
         m_sites.erase(std::remove_if(m_sites.begin(), m_sites.end(), [&](auto& s) { return s.first == a; }), m_sites.end());
         m_tileMeta.erase(a); SaveSites(); TilesSave(m_tileMeta); RenderTab(idx); return;
@@ -2162,11 +2226,13 @@ void BrowserWindow::OnPageMessage(int idx, const std::wstring& msg) {
         RenderTab(idx); return;
     }
     if (c == L"home.sug") { if (a.size() < 200) HomeSug(idx, a); return; }
+    if (c == L"home.sphide") { SponsorHide(a); RenderTab(idx); return; }
+    if (c == L"home.spoff") { m_set.Set(L"sponsored", L"0"); m_sp = SpFeed(); RenderTab(idx); return; }
     if (c == L"default.set") { SetAsDefault(); return; }
     if (c == L"family.toggle") { AskWindows(m_child ? 2 : 1); return; }
     if (c == L"family.unlock") { if (m_child && idx == m_activeTab) { m_authHost = HostOf(m_tabs[idx]->errUrl); AskWindows(4); } return; }
     if (c == L"set") {
-        static const wchar_t* keys[] = { L"engine", L"engine_url", L"startup", L"homepage", L"dl_ask", L"dl_dir", L"clear_start", L"local_block", L"block_images", L"perm_allow", L"smartscreen_off", L"perf", L"block_default", L"save_video", L"https_upgrade", L"fingerprint", L"block_3p" };
+        static const wchar_t* keys[] = { L"engine", L"engine_url", L"startup", L"homepage", L"dl_ask", L"dl_dir", L"clear_start", L"local_block", L"block_images", L"perm_allow", L"smartscreen_off", L"perf", L"block_default", L"save_video", L"https_upgrade", L"fingerprint", L"block_3p", L"agent_on", L"agent_btn", L"agent_opt", L"agent_vauto", L"sponsored", L"autosuggest" };
         if (std::none_of(std::begin(keys), std::end(keys), [&](const wchar_t* k) { return a == k; })) return;
         if (val.size() > 500) return;
         if (a == L"engine") {
@@ -2182,8 +2248,12 @@ void BrowserWindow::OnPageMessage(int idx, const std::wstring& msg) {
         if (a == L"dl_dir" && !val.empty()) { DWORD at = GetFileAttributesW(val.c_str()); if (at == INVALID_FILE_ATTRIBUTES || !(at & FILE_ATTRIBUTE_DIRECTORY)) return; }
         m_set.Set(a, val);
         if (a == L"fingerprint") for (auto& tb : m_tabs) InstallFpScript(tb.get());
+        if (a == L"agent_on" && val != L"1") { AgStop(L"Agent is off."); if (AgDockIdx() >= 0) ToggleAgent(); }   // off = stopped and closed
+        if (a == L"agent_btn") { if (m_hBtnAgent && !m_setup && !m_full) ShowWindow(m_hBtnAgent, AgBtnOn() ? SW_SHOW : SW_HIDE); RECT cr1; GetClientRect(m_hWnd, &cr1); LayoutToolbar(cr1.right); InvalidateRect(m_hWnd, nullptr, FALSE); }
         if (a == L"save_video") { RECT cr0; GetClientRect(m_hWnd, &cr0); LayoutToolbar(cr0.right); }
         if (a == L"save_video") for (auto& tb : m_tabs) { if (val == L"1") AttachVideoSniff(tb.get()); else DetachVideoSniff(tb.get()); }
+        if (a == L"sponsored") { if (val == L"1") { SponsorLoad(); SponsorKick(); } else { m_sp = SpFeed(); } }
+        if (a == L"autosuggest") SgSetting();
         if (a == L"local_block") m_adBlock = (val == L"1");
         if (a == L"block_images") m_imagesOff = (val == L"1");
         if (a == L"block_default") { UpdateBypass(); for (auto& tb : m_tabs) InstallAdScript(tb.get()); }
@@ -2192,16 +2262,18 @@ void BrowserWindow::OnPageMessage(int idx, const std::wstring& msg) {
     if (c == L"engine") {
         bool known = std::any_of(std::begin(kEngines), std::end(kEngines), [&](auto& e) { return a == e.name; });
         if (!known) return;
-        m_set.Set(L"engine", a); m_set.Set(L"welcomed", L"1");   // the page now plays the "all set / built by" moment, then asks us to move on
+        m_set.Set(L"engine", a);   // the page now plays the "all set / built by" moment, then asks us to move on
         return;
     }
     if (c == L"welcome.done") {
+        m_set.Set(L"welcomed", L"1");   // setup is finished only here: closing earlier shows the whole setup again
         { std::wstring hd = DataDir() + L"\\hero"; DeleteFileW((hd + L"\\op.mp4").c_str()); DeleteFileW((hd + L"\\text.png").c_str()); DeleteFileW((hd + L"\\op2.mp4").c_str()); DeleteFileW((hd + L"\\op3.mp4").c_str()); RemoveDirectoryW(hd.c_str()); }
-        if (m_setup) { m_setup = false; for (HWND w : { m_hOmnibox, m_hBtnBack, m_hBtnFwd, m_hBtnRefresh, m_hBtnShield, m_hBtnMenu }) ShowWindow(w, SW_SHOW); ResizeWebViews(); InvalidateRect(m_hWnd, nullptr, FALSE); }   // setup done: the toolbar appears
+        if (m_setup) { m_setup = false; for (HWND w : { m_hOmnibox, m_hBtnBack, m_hBtnFwd, m_hBtnRefresh, m_hBtnShield, m_hBtnAgent, m_hBtnMenu }) ShowWindow(w, SW_SHOW); if (!AgBtnOn()) ShowWindow(m_hBtnAgent, SW_HIDE); ResizeWebViews(); InvalidateRect(m_hWnd, nullptr, FALSE); }   // setup done: the toolbar appears
         if (m_tabs[idx]->url == L"libra://welcome") { m_tabs[idx]->url = L"libra://home"; RenderTab(idx); UpdateOmniboxText(L"libra://home"); }
         return;
     }
     if (c == L"nav") {
+        if (a == L"agent") { ToggleAgent(); return; }
         for (const wchar_t* pg : { L"home", L"tabs", L"settings", L"history", L"bookmarks", L"downloads", L"passwords", L"privacy" })
             if (a == pg) { ShowInternal(L"libra://" + a); break; }
         return;
@@ -2246,8 +2318,8 @@ void BrowserWindow::OnPageMessage(int idx, const std::wstring& msg) {
     }
     if (c == L"newtab")  { OpenTab(L"");       return; }
     if (c == L"private") { OpenTab(L"", true); return; }
-    if (c == L"clear") { ClearData(); RenderTab(idx); return; }
-    if (c == L"hist.clear") { m_hist.clear(); SaveHistory(); }
+    if (c == L"clear") { WipeAll(idx); return; }
+    if (c == L"hist.clear") { WipeAll(idx); return; }   // clearing history clears cookies, site data, cache and the rest too
     else if (c == L"hist.del") { if (i >= 0 && i < (int)m_hist.size()) { m_hist.erase(m_hist.begin() + i); SaveHistory(); } }
     else if (c == L"bm.del")   { if (i >= 0 && i < (int)m_bm.size())   { m_bm.erase(m_bm.begin() + i); SaveBookmarks(); InvalidateRect(m_hWnd, nullptr, FALSE); } }
     else if (c == L"dl.cancel") { if (i >= 0 && i < (int)m_dl.size()) { if (m_dl[i].op) m_dl[i].op->Cancel(); if (m_dl[i].job) m_dl[i].job->cancel = true; } return; }
@@ -2357,7 +2429,8 @@ void BrowserWindow::SetFullscreen(bool on) {
         SetWindowPos(m_hWnd, nullptr, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
     }
     m_full = on;
-    for (HWND h : { m_hOmnibox, m_hBtnBack, m_hBtnFwd, m_hBtnRefresh, m_hBtnShield, m_hBtnMenu }) ShowWindow(h, on ? SW_HIDE : SW_SHOW);
+    for (HWND h : { m_hOmnibox, m_hBtnBack, m_hBtnFwd, m_hBtnRefresh, m_hBtnShield, m_hBtnAgent, m_hBtnMenu }) ShowWindow(h, on ? SW_HIDE : SW_SHOW);
+    if (!on && !AgBtnOn()) ShowWindow(m_hBtnAgent, SW_HIDE);
     ResizeWebViews();
     InvalidateRect(m_hWnd, nullptr, FALSE);
 }
@@ -2579,6 +2652,8 @@ P.play=function(){if(!this.__lbOk&&!ok(this)){try{this.pause()}catch(e){}return 
 document.addEventListener('play',function(e){var el=e.target;if(!el||!el.pause||el.__lbOk)return;if(ok(el)){el.__lbOk=true;return}el.pause()},true);
 document.addEventListener('DOMContentLoaded',function(){[].forEach.call(document.querySelectorAll('video[autoplay],audio[autoplay]'),function(v){v.removeAttribute('autoplay');v.preload='none'})});})();
 var B=new Set()js" + list + LR"js();
+var PR=)js" + AdRulesJson() + LR"js(;
+function pbad(u){if(!u)return false;try{var a=new URL(u,location.href),p=a.pathname.toLowerCase(),h=a.hostname.toLowerCase();for(var i=0;i<PR.length;i++){var r=PR[i];if(r[0]&&h!==r[0]&&!h.endsWith('.'+r[0]))continue;var q=r[1],e=q.charAt(q.length-1)==='$';if(e)q=q.slice(0,-1);if(e?p.endsWith(q):p.indexOf(q)>=0)return true}}catch(x){}return false}
 function bad(u){try{var h=new URL(u,location.href).hostname,p=h.split('.');if(B.has(h))return true;for(var i=1;i<p.length-1;i++)if(B.has(p.slice(i).join('.')))return true}catch(e){}return false}
 var MEDIA='img,video,canvas,svg,picture,object,embed,audio,input,button,textarea,select';
 var LAB=/^(advertisement|advertise|advertorial|sponsored|promoted|ad|ads)$/i;
@@ -2598,8 +2673,11 @@ function hide(e){e.classList.add('lb-c')}
 // after an ad is gone, also collapse parents that are left holding nothing (up to 3 levels, never the page skeleton)
 function up(p){for(var i=0;i<3&&p&&p!==document.body&&p!==document.documentElement&&!/^(MAIN|ARTICLE|NAV|HEADER|FOOTER|FORM)$/.test(p.tagName);i++){if(content(p)||p.querySelector('input,textarea,select,form'))break;hide(p);p=p.parentElement}}
 function kill(n){if(BAL||!n||n.nodeType!==1)return;var t=n.tagName;
+ if(t==='OBJECT'||t==='EMBED'){var ty=(n.getAttribute('type')||'').toLowerCase();if(ty.indexOf('shockwave')>=0||pbad(n.getAttribute('data')||n.getAttribute('src'))){var q0=n.parentElement;n.remove();up(q0);return}}   // Flash and ad-path objects leave only an empty box
+ if((t==='IMG'||t==='SOURCE'||t==='VIDEO'||t==='AUDIO')&&pbad(n.getAttribute('src'))){var q1=n.parentElement;n.remove();up(q1);return}
  if((t==='IFRAME'||t==='SCRIPT'||t==='IMG'||t==='EMBED')&&n.getAttribute('src')&&bad(n.getAttribute('src'))){var p=n.parentElement;n.remove();up(p);return}
- if(n.querySelectorAll)n.querySelectorAll('iframe[src],script[src],img[src]').forEach(kill)}
+ if(n.querySelectorAll)n.querySelectorAll('iframe[src],script[src],img[src],object,embed,source[src],video[src],audio[src]').forEach(kill)}
+if(!BAL)addEventListener('error',function(e){var n=e.target;if(n&&n.tagName==='IMG'&&pbad(n.currentSrc||n.src)){var q=n.parentElement;n.remove();up(q)}},true);   // an image the engine refused: take the broken picture and its empty box away
 // look for slots that stayed empty, collapse them; give the space back if real content arrives later
 function sweep(){
  document.querySelectorAll('.lb-c').forEach(function(e){if(content(e))e.classList.remove('lb-c')});
@@ -2670,6 +2748,7 @@ void BrowserWindow::SaveAllow() {
 void BrowserWindow::UpdateBypass() {   // the page on screen decides how the proxy treats DNS
     std::wstring h; int m, r, n, l;
     DohProxy::Get().SetMode(ShieldCtx(h, m, r, n, l) ? m : 0);
+    Verdicts::Get().SetPrivate(m_incognito || (m_activeTab >= 0 && m_activeTab < (int)m_tabs.size() && m_tabs[m_activeTab]->incognito));   // private pages teach the local block memory nothing
 }
 static int StatDay(int back) {   // local date yyyymmdd, "back" days ago
     time_t t = time(nullptr) - (time_t)back * 86400; tm l; localtime_s(&l, &t); return (l.tm_year + 1900) * 10000 + (l.tm_mon + 1) * 100 + l.tm_mday;
@@ -2683,7 +2762,7 @@ void BrowserWindow::OnBlockedHit(const std::string& host) {
     }
     if (m_hBtnShield) InvalidateRect(m_hBtnShield, nullptr, FALSE);
     if (m_hShield && IsWindowVisible(m_hShield)) {
-        std::wstring h; int m, r, n, l; int ht = MulDiv(ShieldCtx(h, m, r, n, l) ? ShieldSelY() + 134 : 196, m_dpi, 96);
+        std::wstring h; int m, r, n, l; int ht = MulDiv(ShieldCtx(h, m, r, n, l) ? ShieldSelY() + 166 : 196, m_dpi, 96);
         RECT wr; GetWindowRect(m_hShield, &wr);
         if (wr.bottom - wr.top != ht) { int w = wr.right - wr.left; SetWindowPos(m_hShield, nullptr, 0, 0, w, ht, SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
             SetWindowRgn(m_hShield, CreateRoundRectRgn(0, 0, w + 1, ht + 1, MulDiv(30, m_dpi, 96), MulDiv(30, m_dpi, 96)), TRUE); }
@@ -2748,6 +2827,20 @@ RECT BrowserWindow::ShieldSegRect(int i) const {   // 0 Off, 1 Balanced, 2 Max (
     int pad = MulDiv(22, m_dpi, 96), pw = MulDiv(320, m_dpi, 96), y = MulDiv(ShieldSelY(), m_dpi, 96), h = MulDiv(34, m_dpi, 96), in = MulDiv(3, m_dpi, 96);
     int tw = pw - 2 * pad, sw = tw / 3;
     return { pad + i * sw + in, y + in, pad + (i + 1) * sw - in, y + h - in };
+}
+
+RECT BrowserWindow::ShieldKeepRect() const {   // "keep my identity" row (popup client coords)
+    int pad = MulDiv(22, m_dpi, 96), pw = MulDiv(320, m_dpi, 96), y = MulDiv(ShieldSelY() + 104, m_dpi, 96);
+    return { pad, y, pw - pad, y + MulDiv(30, m_dpi, 96) };
+}
+bool BrowserWindow::KeepIdHere() { std::wstring h; int m, r, n, l; return ShieldCtx(h, m, r, n, l) && m_keepId.count(SiteOf(h)); }
+void BrowserWindow::ToggleKeepId() {
+    std::wstring h; int m, r, n, l; if (!ShieldCtx(h, m, r, n, l)) return;
+    std::wstring s = SiteOf(h); if (!m_keepId.erase(s)) m_keepId.insert(s);
+    std::string o; for (auto& k : m_keepId) o += ToUtf8(k) + "\n"; WriteAll(DataDir() + L"\\keepid.txt", o);
+    for (auto& tb : m_tabs) InstallFpScript(tb.get());
+    if (m_activeTab >= 0 && m_tabs[m_activeTab]->webView) m_tabs[m_activeTab]->webView->Reload();
+    HideShield();
 }
 
 void BrowserWindow::PaintShield(HDC hdc) {
@@ -2835,6 +2928,14 @@ void BrowserWindow::PaintShield(HDC hdc) {
            : mode == 1 ? L"Cloud ad blocking stops trackers. About half of the ads load, a different half each visit."
            : L"Cloud ad blocking stops all ads and trackers. Turn it down if a site does not load properly.", hr, fs, grey, DT_LEFT | DT_WORDBREAK);
     }
+    if (http && mode != 2) {   // keep the same identity on this site (the daily change is off for it)
+        RECT kr = ShieldKeepRect(); bool on = KeepIdHere();
+        text(L"Keep my identity on this site", { kr.left, kr.top, kr.right - (int)(48 * k), kr.bottom }, fs, ink, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+        RECT sw = { kr.right - (int)(40 * k), kr.top + (int)(6 * k), kr.right, kr.top + (int)(24 * k) };
+        FillRR(hdc, sw, (sw.bottom - sw.top) / 2, on ? RGB(17, 17, 17) : RGB(214, 214, 214));
+        int d = sw.bottom - sw.top - (int)(4 * k); int x0 = on ? sw.right - d - (int)(2 * k) : sw.left + (int)(2 * k);
+        FillRR(hdc, { x0, sw.top + (int)(2 * k), x0 + d, sw.top + (int)(2 * k) + d }, d / 2, RGB(255, 255, 255));
+    }
     RECT fr = { pad, rc.bottom - (int)(34 * k), rc.right - pad, rc.bottom - (int)(12 * k) };
     text(L"Cloud ad blocking  \x00b7  blocked in total: " + Num(m_totalBlocked), fr, fs, grey, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
     DeleteObject(fb); DeleteObject(fs); DeleteObject(fbig); DeleteObject(fl); DeleteObject(fsb);
@@ -2855,7 +2956,7 @@ void BrowserWindow::ToggleShieldPopup() {
         SetWindowLongPtrW(m_hShield, GWLP_USERDATA, (LONG_PTR)this);
     }
     std::wstring h; int m, r, n, l; bool http = ShieldCtx(h, m, r, n, l);
-    int w = MulDiv(320, m_dpi, 96), ht = MulDiv(http ? ShieldSelY() + 134 : 196, m_dpi, 96);
+    int w = MulDiv(320, m_dpi, 96), ht = MulDiv(http ? ShieldSelY() + 166 : 196, m_dpi, 96);
     RECT br; GetWindowRect(m_hBtnShield, &br);
     SetWindowPos(m_hShield, HWND_TOPMOST, br.right - w, br.bottom + MulDiv(6, m_dpi, 96), w, ht, SWP_SHOWWINDOW);
     SetWindowRgn(m_hShield, CreateRoundRectRgn(0, 0, w + 1, ht + 1, MulDiv(30, m_dpi, 96), MulDiv(30, m_dpi, 96)), TRUE);
@@ -2876,13 +2977,15 @@ LRESULT CALLBACK BrowserWindow::ShieldProc(HWND h, UINT msg, WPARAM wp, LPARAM l
         SelectObject(mem, old); DeleteObject(bmp); DeleteDC(mem); EndPaint(h, &ps); return 0;
     }
     case WM_LBUTTONDOWN: {
-        int i = segAt({ GET_X_LPARAM(lp), GET_Y_LPARAM(lp) });
+        POINT cp = { GET_X_LPARAM(lp), GET_Y_LPARAM(lp) }; RECT kr = bw->ShieldKeepRect();
+        if (PtInRect(&kr, cp)) { std::wstring hs; int m2, r2, n2, l2; if (bw->ShieldCtx(hs, m2, r2, n2, l2) && m2 != 2) { bw->ToggleKeepId(); return 0; } }
+        int i = segAt(cp);
         if (i >= 0) bw->SetSiteMode(i == 0 ? 2 : i == 1 ? 1 : 0);
         return 0;
     }
     case WM_SETCURSOR: {
         POINT pt; GetCursorPos(&pt); ScreenToClient(h, &pt);
-        SetCursor(LoadCursor(nullptr, segAt(pt) >= 0 ? IDC_HAND : IDC_ARROW)); return TRUE;
+        RECT kr = bw->ShieldKeepRect(); SetCursor(LoadCursor(nullptr, (segAt(pt) >= 0 || PtInRect(&kr, pt)) ? IDC_HAND : IDC_ARROW)); return TRUE;
     }
     case WM_ACTIVATE: if (LOWORD(wp) == WA_INACTIVE) bw->HideShield(); return 0;
     case WM_KEYDOWN: if (wp == VK_ESCAPE) bw->HideShield(); return 0;
@@ -2895,3 +2998,23 @@ LRESULT CALLBACK BrowserWindow::ShieldProc(HWND h, UINT msg, WPARAM wp, LPARAM l
 #include "Privacy.inl"
 #include "Video.inl"
 #include "Fp.inl"
+#include "Agent.inl"
+#include "Sponsor.inl"
+#include "Suggest.inl"
+
+void BrowserWindow::DrawAgentIcon(HDC hdc, RECT rc, bool open) {   // two thin sparkles; filled when the assistant is open
+    float k = m_dpi / 96.f, cx = (rc.left + rc.right) / 2.f - 1 * k, cy = (rc.top + rc.bottom) / 2.f + 1 * k;
+    Gdiplus::Graphics g(hdc); g.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
+    auto star = [&](Gdiplus::GraphicsPath& p, float x, float y, float r) {
+        p.AddBezier(x, y - r, x + r * .12f, y - r * .45f, x + r * .45f, y - r * .12f, x + r, y);
+        p.AddBezier(x + r, y, x + r * .45f, y + r * .12f, x + r * .12f, y + r * .45f, x, y + r);
+        p.AddBezier(x, y + r, x - r * .12f, y + r * .45f, x - r * .45f, y + r * .12f, x - r, y);
+        p.AddBezier(x - r, y, x - r * .45f, y - r * .12f, x - r * .12f, y - r * .45f, x, y - r); p.CloseFigure(); };
+    Gdiplus::GraphicsPath a, b; star(a, cx - 1 * k, cy - 1 * k, 8.5f * k); star(b, cx + 8 * k, cy + 7 * k, 4.2f * k);   // big sparkle top-left, small one bottom-right
+    Gdiplus::Pen pen(GC(Color::TextPrimary), 1.9f * k); pen.SetLineJoin(Gdiplus::LineJoinRound);
+    Gdiplus::SolidBrush br(GC(Color::TextPrimary));
+    if (open) g.FillPath(&br, &a); else g.DrawPath(&pen, &a);
+    g.FillPath(&br, &b);
+}
+
+#include "Voice.inl"

@@ -21,7 +21,7 @@ static std::wstring UrlArg(PCWSTR cl) {   // first http(s) address on the comman
 int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR lpCmdLine, int nCmdShow) {
     if (lpCmdLine && wcsstr(lpCmdLine, L"--register-default")) return RegisterAsBrowser() ? 0 : 1;
     // Single-instance: bring existing window to front if already running
-    HWND existing = FindWindowW(L"LibraBrowserWnd", nullptr);
+    HWND existing = TestEnv(L"LIBRA_TEST_MULTI", nullptr, 0) ? nullptr : FindWindowW(L"LibraBrowserWnd", nullptr);   // test hook: isolated test run beside a real window
     if (existing) {
         ShowWindow(existing, SW_RESTORE);
         SetForegroundWindow(existing);

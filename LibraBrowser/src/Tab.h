@@ -18,7 +18,7 @@ struct Tab {
     int          letThrough = 0;                      // ads allowed through (Balanced mode)
     std::vector<std::pair<std::wstring, long long>> vids;   // videos found on this page (Save videos)
     bool         vidOn = false; EventRegistrationToken tokVid{};
-    std::wstring fpScriptId, upHost, upUrl; DWORD upTick = 0;   // fingerprint script id; https-upgrade bookkeeping
+    std::wstring fpScriptId, sgScriptId, upHost, upUrl; DWORD upTick = 0;   // fingerprint script id; https-upgrade bookkeeping
     int          blockedAds = 0;                      // of those, the ones that looked like ad networks
     int          blockedReq = 0;                      // requests the DNS refused while this page was open
     std::unordered_map<std::string, int> blockedHosts;   // host -> hits    // ...from how many different ad/tracker servers
@@ -37,6 +37,7 @@ struct Tab {
 
     wil::com_ptr<ICoreWebView2Controller> controller;
     wil::com_ptr<ICoreWebView2>           webView;
+    std::vector<wil::com_ptr<ICoreWebView2Frame2>> frames;   // embedded frames (also other-site ones), tracked for the Agent
 
     // Event registration tokens — stored so we can unregister on close
     EventRegistrationToken tokNavStart   {};

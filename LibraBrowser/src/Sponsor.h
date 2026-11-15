@@ -1,4 +1,4 @@
-// Sponsored content: signed feed parsing and verification (pure code, no UI). See PLAN-sponsored.md.
+// Sponsored content: signed feed parsing and verification (pure code, no UI).
 // A feed is {"kid","payload","sig"}: payload is the exact JSON text that the Worker signed (ECDSA P-256, SHA-256, raw r||s, base64url).
 #pragma once
 #ifndef NOMINMAX

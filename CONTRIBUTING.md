@@ -1,6 +1,6 @@
 # Contributing
 
-Libra is **source available**, not open source: the license does not allow modifying or redistributing the code without written permission from Psylinks Security Private Limited.
+Libra is **open source under Apache-2.0**, open source under Apache-2.0: the license does not allow modifying or redistributing the code without written permission from Psylinks Security Private Limited.
 
 What you are welcome to do:
 - Read and audit the code, and report problems (bugs, privacy or security issues).

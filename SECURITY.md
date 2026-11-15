@@ -8,6 +8,3 @@ Found a vulnerability? Please report it privately, not in a public issue.
 - We aim to reply within 7 days and will credit you if you wish.
 
 Scope: the Libra application and its DNS-over-HTTPS proxy. Issues in Microsoft's WebView2 runtime should go to Microsoft. See `SECURITY-AUDIT.md` for what has already been reviewed and the known limits.
-
-
-The public contact follows Psylinks Security’s official Inspector responsible-disclosure instructions. Please send only a short summary by email; sensitive proof-of-concept details should be shared through the secure channel they provide.

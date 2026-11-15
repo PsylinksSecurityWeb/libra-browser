@@ -1,6 +1,6 @@
 // Path rules: ads that live on a site's OWN server (so the DNS blocklist cannot see them) are refused by their address before the request is sent.
 // A short reviewed list, written for Libra Browser. Deliberately specific: never a bare "/banners/" or the word "advertising" (real sites keep real pictures there).
-// Max mode only (the shield's Balanced and Off keep working as the escape). See PLAN-banner-rules.md.
+// Max mode only (the shield's Balanced and Off keep working as the escape).
 #pragma once
 #include <string>
 #include <vector>

@@ -27,16 +27,16 @@ namespace Color {
     constexpr COLORREF Shadow         = RGB(0,   0,   0);
 
     // Incognito: still bright, just a light-grey tint
-    constexpr COLORREF IncognitoChrome = RGB(214, 214, 214);
-    constexpr COLORREF IncognitoTabBg  = RGB(222, 222, 222);  // toolbar
-    constexpr COLORREF IncognitoText   = RGB(0,   0,   0);
-    constexpr COLORREF DarkSurface     = RGB(214, 214, 214);
-    constexpr COLORREF DarkToolbar     = RGB(222, 222, 222);
-    constexpr COLORREF DarkTab         = RGB(232, 232, 232);
-    constexpr COLORREF DarkTabActive   = RGB(255, 255, 255);
-    constexpr COLORREF DarkOmnibox     = RGB(255, 255, 255);
-    constexpr COLORREF DarkText        = RGB(0,   0,   0);
-    constexpr COLORREF DarkBorder      = RGB(255, 255, 255);
+    constexpr COLORREF IncognitoChrome = RGB(32, 33, 36);
+    constexpr COLORREF IncognitoTabBg  = RGB(41, 42, 46);  // toolbar
+    constexpr COLORREF IncognitoText   = RGB(240, 240, 240);
+    constexpr COLORREF DarkSurface     = RGB(32, 33, 36);
+    constexpr COLORREF DarkToolbar     = RGB(41, 42, 46);
+    constexpr COLORREF DarkTab         = RGB(32, 33, 36);
+    constexpr COLORREF DarkTabActive   = RGB(41, 42, 46);
+    constexpr COLORREF DarkOmnibox     = RGB(60, 62, 68);
+    constexpr COLORREF DarkText        = RGB(240, 240, 240);
+    constexpr COLORREF DarkBorder      = RGB(70, 72, 78);
 }
 
 // --- Layout Metrics (96-dpi px) ----------------------------------------------

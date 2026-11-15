@@ -1,5 +1,5 @@
 // Auto suggest matcher (pure code, no UI, no network, no AI). Notes -> key/value pairs; a form field description -> best values.
-// See PLAN-autosuggest.md. Sensitive fields (passwords, user names, cards, ID numbers, one-time codes...) are NEVER matched.
+// Sensitive fields (passwords, user names, cards, ID numbers, one-time codes...) are NEVER matched.
 #pragma once
 #include "Sponsor.h"   // SpReadStr (JSON string reader)
 #include <set>

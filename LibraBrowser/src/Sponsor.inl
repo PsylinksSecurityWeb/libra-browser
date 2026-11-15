@@ -1,11 +1,11 @@
-// Sponsored tiles and background on the new-tab page. Included at the end of BrowserWindow.cpp. See PLAN-sponsored.md.
+// Sponsored tiles and background on the new-tab page. Included at the end of BrowserWindow.cpp.
 // Inert until the owner's public key is set below. Sends nothing about the user: one anonymous GET of the signed feed per day.
 // Hidden for private windows, Child Safety, first run, and when the user switched it off (Settings > Privacy).
 
 struct SpCfg { std::wstring feed; std::string base; std::vector<SpKeyA> keys; bool test = false; };
 static SpCfg SpConfig() {
-    SpCfg c; c.feed = L"https://feed.psylinks-beta.com/v1/feed";   // OWNER: the https address where the Worker answers (same host as PUBLIC_BASE)
-    static const SpKeyA owner[2] = { { "k1", "", "" }, { "k2", "", "" } };   // OWNER: paste x and y printed by sponsor-worker\genkey.mjs (k2 is the spare for key rotation)
+    SpCfg c; c.feed = L"";   // publisher configures this only with a verified HTTPS endpoint and matching public keys
+    static const SpKeyA owner[2] = { { "k1", "", "" }, { "k2", "", "" } };   // public signing keys (x, y); k2 is a spare for key rotation. Empty = the feature stays off
     for (auto& k : owner) c.keys.push_back(k);
     wchar_t f[512], k[512];
     if (TestEnv(L"LIBRA_TEST_SPFEED", f, 512) && TestEnv(L"LIBRA_TEST_SPKEY", k, 512)) {   // tests only: "kid|x|y"

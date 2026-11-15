@@ -9,6 +9,8 @@
 #include "AdRules.h"
 #include "Vault.h"
 #include <set>
+#include <deque>
+#include <functional>
 
 // Forward declarations
 class BrowserApp;
@@ -73,6 +75,11 @@ private:
     void OnLButtonDown(int x, int y);
     bool OnSetCursor(HWND hwnd, UINT hitTest);
     void OnTimer(UINT_PTR id);
+    void HoldBegin(int i); void HoldDone(void* p); bool HoldRelease(int i); bool HoldSandbox(int i); void HoldSandboxCleanup(); std::wstring m_riskNote;   // download quarantine (Hold.inl)
+    void OpenShot(); bool ShotKey(UINT vk); bool ShotTimer(UINT_PTR id);   // Screenshot (Shot.inl)
+    void Burn();                       // hamburger: Burn (Burn.inl)
+    bool BurnTimer(UINT_PTR id);
+    bool m_burning = false; Tab* m_burnTab = nullptr; std::function<void(bool, std::wstring)> m_wipeDone;   // called once when WipeAll has finished
     void ShowContextMenu(int x, int y);
 
     // â”€â”€â”€ Tab-bar hit testing â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -99,9 +106,13 @@ private:
     void AttachDownloads(ICoreWebView2* wv);
     void SyncDownload(ICoreWebView2DownloadOperation* op, bool render);
     struct PendingDl { wil::com_ptr<ICoreWebView2DownloadStartingEventArgs> args; wil::com_ptr<ICoreWebView2Deferral> def;
-                       wil::com_ptr<ICoreWebView2DownloadOperation> op; std::wstring name; };
+                       wil::com_ptr<ICoreWebView2DownloadOperation> op; std::wstring name, path; };
     std::map<void*, PendingDl> m_pending;       // downloads waiting for the range probe (UI thread only)
-    void AdoptDownload(ICoreWebView2DownloadStartingEventArgs* a, ICoreWebView2DownloadOperation* op, const std::wstring& name);
+    void AdoptDownload(ICoreWebView2DownloadStartingEventArgs* a, ICoreWebView2DownloadOperation* op, const std::wstring& name, const std::wstring& chosen);
+    // ask-before-download gate (SaveAsk.inl): nothing starts until the user presses Save
+    void SaveGate(const std::wstring& name, const std::wstring& url, Tab* tab, std::function<void(std::wstring)> cb); void SaveNext(); bool SaveTimer(UINT_PTR id); std::wstring SaveAskPath(const std::wstring& name);
+    void DlContinue(wil::com_ptr<ICoreWebView2DownloadStartingEventArgs> a, wil::com_ptr<ICoreWebView2Deferral> def, wil::com_ptr<ICoreWebView2DownloadOperation> op,
+                    wil::com_ptr<ICoreWebView2> snd, const std::wstring& name, const std::wstring& url, const std::wstring& chosen);
     void OnProbeDone(std::shared_ptr<DlJob> job, bool ok);
     void SyncJobs();
     void ClearData();
@@ -127,7 +138,7 @@ private:
     int ShieldRows() const;   // top-blocked rows shown in the popup (0 = compact layout)
     int ShieldSelY() const;   // 96-dpi y of the Off/Balanced/Max selector
     void PaintShield(HDC hdc);
-    void DrawShieldIcon(HDC hdc, RECT rc, bool hot); void DrawAgentIcon(HDC hdc, RECT rc, bool open);
+    void DrawShieldIcon(HDC hdc, RECT rc, bool hot); void DrawAgentIcon(HDC hdc, RECT rc, bool open); void DrawShotIcon(HDC hdc, RECT rc);
     static LRESULT CALLBACK ShieldProc(HWND, UINT, WPARAM, LPARAM);
     std::map<std::wstring, int> m_modes;       // site -> 0 Max, 1 Balanced, 2 Off
     unsigned long long m_totalBlocked = 0;
@@ -137,7 +148,7 @@ private:
     // --- privacy page, default browser (Privacy.inl) ---
     void AttachVideoSniff(Tab* t); void DetachVideoSniff(Tab* t); void ShowVideoPopup(); RECT VidRect() const;
     void StartVideoDownload(Tab* t, int idx); void AttachContextSave(Tab* t);
-    void StartSave(Tab* t, const std::wstring& url, const std::wstring& nameBase, const std::wstring& extHint, bool useTitle); void OnVideoProbe(std::shared_ptr<DlJob> job, bool ok);
+    void StartSave(Tab* t, const std::wstring& url, const std::wstring& nameBase, const std::wstring& extHint, bool useTitle); void StartSaveTo(Tab* t, const std::wstring& url, const std::wstring& path); void OnVideoProbe(std::shared_ptr<DlJob> job, bool ok);
     std::map<DlJob*, std::shared_ptr<DlJob>> m_vidJobs;
     void DlPush(); void ApplyMemoryLevels();
     void InstallFpScript(Tab* t); unsigned m_fpSeed = 0; int m_fpDay = 0; std::set<std::wstring> m_httpOk;
@@ -223,12 +234,17 @@ private:
     HWND       m_hBtnMenu    = nullptr;
     HWND       m_hBtnShield  = nullptr;
     HWND       m_hBtnAgent   = nullptr;
+    HWND       m_hBtnShot    = nullptr;   // toolbar camera: screenshot
     WNDPROC    m_origOmniboxProc = nullptr;
 
     std::vector<std::unique_ptr<Tab>> m_tabs;
     int        m_activeTab   = -1;
     int        m_hoveredTab  = -1;
     bool       m_incognito   = false;
+    std::wstring m_privDir;          // private window: throw-away profile folder
+public:
+    void NewPrivateWindow();
+private:
     bool       m_adBlock     = false;   // local blocking OFF by default; tracker blocking is done by the DoH server
     bool       m_imagesOff   = false;
     UINT       m_dpi         = 96;

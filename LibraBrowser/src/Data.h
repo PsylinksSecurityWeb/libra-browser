@@ -22,9 +22,14 @@ inline const Engine kEngines[] = {
 struct HistoryItem  { long long t = 0; std::wstring url, title; };
 struct BookmarkItem { std::wstring url, title; };
 struct DlJob;
+inline std::wstring WinSandboxExe() {   // empty when the Windows Sandbox feature is not installed (Home, or not turned on)
+    static std::wstring p = [] { wchar_t w[MAX_PATH]; UINT n = GetSystemDirectoryW(w, MAX_PATH); if (!n || n >= MAX_PATH) return std::wstring();
+        std::wstring x = std::wstring(w) + L"\\WindowsSandbox.exe"; return GetFileAttributesW(x.c_str()) != INVALID_FILE_ATTRIBUTES ? x : std::wstring(); }();
+    return p;
+}
 struct DownloadItem {
     std::shared_ptr<DlJob> job;   // set when our segmented downloader owns this download
-    std::wstring name, path; long long total = 0, got = 0; int state = 0; double speed = 0; long long lastGot = 0; DWORD lastTick = 0; bool canRetry = false; char toast = 0;   // 0 active, 1 done, 2 failed/cancelled
+    std::wstring name, path; long long total = 0, got = 0; int state = 0; double speed = 0; long long lastGot = 0; DWORD lastTick = 0; bool canRetry = false; char toast = 0; char hold = 0; DWORD doneTick = 0; std::wstring orig, scanNote;   /* hold: 1 scanning, 2 held, 3 removed by Windows Security */   // 0 active, 1 done, 2 failed/cancelled
     wil::com_ptr<ICoreWebView2DownloadOperation> op;
 };
 

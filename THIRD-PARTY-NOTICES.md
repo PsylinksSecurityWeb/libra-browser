@@ -1,6 +1,6 @@
 # Third-party notices
 
-Libra Browser itself is under the Apache-2.0 license (see `LICENSE`). It builds on the following; each keeps its own license.
+Libra Browser itself is under the Libra Source-Available License (see `LICENSE`). It builds on the following; each keeps its own license.
 
 | Component | Used for | License |
 |---|---|---|

@@ -1,6 +1,6 @@
 // Auto suggest: click an empty text box, see what your saved notes say, click it to type it. Included at the end of BrowserWindow.cpp.
 // LOCAL ONLY: no AI, no network, nothing leaves the PC. The page tells us only which box you clicked (SgSite.h). The popup is a Libra window
-// the site cannot see or click; the text is typed only after YOU click a row, into the same still-empty box. See PLAN-autosuggest.md.
+// the site cannot see or click; the text is typed only after YOU click a row, into the same still-empty box.
 #include "SgSite.h"
 
 static const wchar_t* kSgClass = L"LibraSg";

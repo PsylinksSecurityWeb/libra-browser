@@ -78,7 +78,11 @@ void BrowserWindow::StartSave(Tab* t, const std::wstring& url, const std::wstrin
     std::wstring base = useTitle || fname.empty() ? nameBase : fname; if (base.empty()) base = L"download"; if (base.size() > 90) base.resize(90);
     std::wstring ext = L"";
     if (useTitle || !hasExt) { ext = extHint; if (hasExt) ext = fname.substr(dot); }
-    std::wstring path = UniquePath(DownloadsDir(m_set) + L"\\" + SafeName(base) + ext);
+    std::wstring suggested = SafeName(base) + ext;
+    SaveGate(suggested, url, t, [this, t, url](std::wstring path) { if (path.empty() || IndexOf(t) < 0) return; StartSaveTo(t, url, path); });   // the Save window first: nothing is fetched before it
+}
+void BrowserWindow::StartSaveTo(Tab* t, const std::wstring& url, const std::wstring& path) {
+    int port = DohProxy::Get().Port(); if (!port || !t->webView) return;
     auto job = std::make_shared<DlJob>(); job->url = url; job->port = port; job->path = path; job->part = path + L".libra-part";
     m_vidJobs[job.get()] = job;
     std::wstring ref = IsHttp(t->url) ? t->url : L"", ua;
@@ -107,7 +111,7 @@ void BrowserWindow::OnVideoProbe(std::shared_ptr<DlJob> job, bool ok) {
     DownloadItem d; d.job = job; d.path = job->path; d.total = job->total;
     size_t sl = job->path.find_last_of(L"\\/"); d.name = sl == std::wstring::npos ? job->path : job->path.substr(sl + 1);
     if (ok) {
-        ULARGE_INTEGER fb{}; if (GetDiskFreeSpaceExW(DownloadsDir(m_set).c_str(), &fb, nullptr, nullptr) && (ULONGLONG)job->total + (64ull << 20) > fb.QuadPart) ok = false;
+        ULARGE_INTEGER fb{}; if (GetDiskFreeSpaceExW(job->path.substr(0, job->path.find_last_of(L"\\/")).c_str(), &fb, nullptr, nullptr) && (ULONGLONG)job->total + (64ull << 20) > fb.QuadPart) ok = false;
     }
     if (!ok || job->total < (4ll << 20)) {   // small file or no byte ranges: one plain connection
         job->total = ok ? job->total : 0; d.total = job->total; m_dl.push_back(d);
@@ -135,8 +139,13 @@ void BrowserWindow::DlPush() {   // live numbers into the open Downloads page: n
             if (!d.lastTick) { d.lastTick = now; d.lastGot = d.got; }
             else if (now - d.lastTick >= 200) { double inst = (d.got - d.lastGot) * 1000.0 / (now - d.lastTick); d.speed = d.speed > 0 ? d.speed * 0.55 + inst * 0.45 : inst; d.lastGot = d.got; d.lastTick = now; }
         } else d.speed = 0;
-        if (d.state == 1 && !(d.toast & 4) && !d.path.empty() && IsRiskyFile(d.name.empty() ? d.path : d.name)) {   // a finished file that can run programs: ask first
-            if (GetForegroundWindow() == m_hWnd && !(m_pwKind == 1 && m_hPw && IsWindowVisible(m_hPw))) { d.toast |= 7; m_riskPath = d.path; m_toastN = d.name.empty() ? d.path : d.name; ShowPw(7, nullptr, L""); }
+        if (d.state == 1 && d.hold == 0 && !(d.toast & 8) && !d.path.empty() && IsRiskyFile(d.name.empty() ? d.path : d.name)) {
+            if (!d.doneTick) d.doneTick = now;
+            if (now - d.doneTick < 2500) active = true;   // let the engine finish its own work on the file first (it re-opens it), then hold it
+            else { d.toast |= 8; HoldBegin(i); }
+        }   // a finished file that can run programs: scan + hold first
+        else if (d.hold == 2 && !(d.toast & 4)) {   // held: tell the user (once, when Libra is in front)
+            if (GetForegroundWindow() == m_hWnd && !(m_pwKind == 1 && m_hPw && IsWindowVisible(m_hPw))) { d.toast |= 7; m_riskPath = d.path; m_riskNote = d.scanNote; m_toastN = d.name.empty() ? d.path : d.name; ShowPw(7, nullptr, L""); }
         }
         int ev = !(d.toast & 1) ? 1 : (d.state == 1 && !(d.toast & 2)) ? 2 : 0;   // toast: started / finished
         if (ev && d.state != 2 && !(m_pwKind == 1 && m_hPw && IsWindowVisible(m_hPw)) && GetForegroundWindow() == m_hWnd) {
@@ -175,6 +184,21 @@ void BrowserWindow::AttachContextSave(Tab* t) {   // right-click: one clear "Sav
             else if (hasLink && link.get()) { url = link.get(); label = L"Save link as file"; }
             else if (kind == COREWEBVIEW2_CONTEXT_MENU_TARGET_KIND_PAGE && IsHttp(t->url) && t->url.substr(0, t->url.find_first_of(L"?#")).size() > 4 &&
                      _wcsicmp(t->url.substr(0, t->url.find_first_of(L"?#")).c_str() + t->url.substr(0, t->url.find_first_of(L"?#")).size() - 4, L".pdf") == 0) { url = t->url; label = L"Save PDF"; ext = L".pdf"; }
+            wil::com_ptr<ICoreWebView2ContextMenuItemCollection> items; a->get_MenuItems(&items);
+            if (hasLink && link.get() && IsHttp(link.get()) && items) {   // links: "Open link in new tab" is the first entry; the engine's own new-window / InPrivate entries go
+                for (int i = (int)([&] { UINT n = 0; items->get_Count(&n); return n; }()) - 1; i >= 0; --i) {
+                    wil::com_ptr<ICoreWebView2ContextMenuItem> o; items->GetValueAtIndex(i, &o); if (!o) continue;
+                    wil::unique_cotaskmem_string nm; o->get_Name(&nm); std::wstring n = nm.get() ? nm.get() : L"";
+                    if (n.find(L"InNewWindow") != std::wstring::npos || n.find(L"InPrivate") != std::wstring::npos || n.find(L"InIncognito") != std::wstring::npos) items->RemoveValueAtIndex(i);
+                }
+                wil::com_ptr<ICoreWebView2ContextMenuItem> ot;
+                if (SUCCEEDED(e9->CreateContextMenuItem(L"Open link in new tab", nullptr, COREWEBVIEW2_CONTEXT_MENU_ITEM_KIND_COMMAND, &ot)) && ot) {
+                    EventRegistrationToken tk3; std::wstring lk = link.get();
+                    ot->add_CustomItemSelected(Microsoft::WRL::Callback<ICoreWebView2CustomItemSelectedEventHandler>(
+                        [this, t, lk](ICoreWebView2ContextMenuItem*, IUnknown*) -> HRESULT { if (IndexOf(t) >= 0) OpenTab(lk); return S_OK; }).Get(), &tk3);
+                    items->InsertValueAtIndex(0, ot.get());
+                }
+            }
             if (label.empty() || (!video && !IsHttp(url))) return S_OK;   // blob:/data: sources keep the default menu
             wil::com_ptr<ICoreWebView2ContextMenuItem> it;
             if (FAILED(e9->CreateContextMenuItem(label.c_str(), nullptr, COREWEBVIEW2_CONTEXT_MENU_ITEM_KIND_COMMAND, &it)) || !it) return S_OK;
@@ -188,8 +212,12 @@ void BrowserWindow::AttachContextSave(Tab* t) {   // right-click: one clear "Sav
                     } else StartSave(t, url, L"download", ext, false);
                     return S_OK;
                 }).Get(), &tk2);
-            wil::com_ptr<ICoreWebView2ContextMenuItemCollection> items; a->get_MenuItems(&items);
-            if (items) items->InsertValueAtIndex(0, it.get());
+            if (items) {   // Save entries go in the last section
+                UINT n = 0; items->get_Count(&n);
+                wil::com_ptr<ICoreWebView2ContextMenuItem> sp;
+                if (SUCCEEDED(e9->CreateContextMenuItem(L"", nullptr, COREWEBVIEW2_CONTEXT_MENU_ITEM_KIND_SEPARATOR, &sp)) && sp) { items->InsertValueAtIndex(n, sp.get()); ++n; }
+                items->InsertValueAtIndex(n, it.get());
+            }
             return S_OK;
         }).Get(), &tk);
 }

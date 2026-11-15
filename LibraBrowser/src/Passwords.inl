@@ -162,7 +162,7 @@ void BrowserWindow::HidePw() {
 void BrowserWindow::PwClick(int what) {
     if (m_pwAnim == 2) return;
     if (m_pwKind == 4) { Tab* t = m_pwTab; HidePw(); if (what >= 10 && t && IndexOf(t) >= 0) StartVideoDownload(t, what - 10); return; }
-    if (m_pwKind == 7) { HidePw(); if (what == 0 && !m_riskPath.empty()) { DeleteFileW(m_riskPath.c_str()); for (auto& d : m_dl) if (d.path == m_riskPath) { d.state = 2; d.canRetry = false; } for (int i = 0; i < (int)m_tabs.size(); ++i) if (m_tabs[i]->url == L"libra://downloads") RenderTab(i); } return; }
+    if (m_pwKind == 7) { HidePw(); if (what == 1) { for (int di = 0; di < (int)m_dl.size(); ++di) if (m_dl[di].path == m_riskPath && m_dl[di].hold == 2) { wchar_t tp[8]; bool yes = TestEnv(L"LIBRA_TEST_SAVEPATH", tp, 8) > 0 || MessageBoxW(m_hWnd, L"This file can run programs. Libra held it so nothing could start it by accident.\n\nRelease it only if you trust the site it came from.", L"Release this file?", MB_YESNO | MB_ICONWARNING | MB_DEFBUTTON2) == IDYES; if (yes) HoldRelease(di); } for (int ti = 0; ti < (int)m_tabs.size(); ++ti) if (m_tabs[ti]->url == L"libra://downloads") RenderTab(ti); return; } if (what == 0 && !m_riskPath.empty()) { DeleteFileW(m_riskPath.c_str()); for (auto& d : m_dl) if (d.path == m_riskPath) { d.state = 2; d.canRetry = false; } for (int i = 0; i < (int)m_tabs.size(); ++i) if (m_tabs[i]->url == L"libra://downloads") RenderTab(i); } return; }
     if (m_pwKind == 5) { Tab* ct = m_pwTab; HidePw(); if (what == 0) { int ix = IndexOf(ct); if (ix >= 0 && ix != m_activeTab) CloseTab(ix); } return; }
     if (m_pwKind == 3) { HidePw(); if (what == 0) ToggleShieldPopup(); return; }
     if (m_pwKind == 6) { HidePw(); if (what == 0) ShowInternal(L"libra://downloads", true); return; }
@@ -267,10 +267,10 @@ void BrowserWindow::PaintPw(HDC hdc) {
     }
     if (m_pwKind == 7) {   // risky file finished
         HFONT fl = font(22, FW_LIGHT);
-        text(L"This file can run programs", { pad, (int)(14 * k), rc.right - pad, (int)(44 * k) }, fl, ink, DT_LEFT | DT_VCENTER);
+        text(L"Held for your safety", { pad, (int)(14 * k), rc.right - pad, (int)(44 * k) }, fl, ink, DT_LEFT | DT_VCENTER);
         text(m_toastN, { pad, (int)(48 * k), rc.right - pad, (int)(72 * k) }, fb, ink, DT_LEFT | DT_END_ELLIPSIS);
-        text(L"Keep it only if you trust the site it came from.", { pad, (int)(76 * k), rc.right - pad, (int)(104 * k) }, fs, grey, DT_LEFT);
-        const wchar_t* names[2] = { L"Delete", L"Keep" };
+        text(m_riskNote.empty() ? L"Release it only if you trust the site." : m_riskNote, { pad, (int)(76 * k), rc.right - pad, (int)(104 * k) }, fs, grey, DT_LEFT | DT_END_ELLIPSIS);
+        const wchar_t* names[2] = { L"Delete", L"Release" };
         for (int i = 0; i < 2; ++i) {
             RECT b = PwRect(i); bool pri = i == 0, hot = m_pwHot == i;
             FillRR(hdc, b, (b.bottom - b.top) / 2, pri ? (hot ? RGB(60, 60, 60) : RGB(17, 17, 17)) : (hot ? RGB(226, 226, 226) : RGB(239, 239, 239)));

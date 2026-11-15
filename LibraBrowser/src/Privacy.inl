@@ -45,6 +45,13 @@ static void PrivWipeCachesAtStart() {   // "cached files" also means the GPU, sh
     DeleteFileW(flag.c_str());
 }
 
+static void PrivWipeSessionAtStart(bool keepCookies) {   // "Clear at startup": the engine is not running, so nothing is locked. keepCookies = the cookie file stays and is swept per site after the engine opens.
+    const std::wstring p = ProfileDir();
+    for (const wchar_t* n : { L"\\Default\\Local Storage", L"\\Default\\IndexedDB", L"\\Default\\Session Storage", L"\\Default\\Service Worker", L"\\Default\\File System", L"\\Default\\Shared Dictionary", L"\\Default\\blob_storage", L"\\Default\\Storage", L"\\Default\\WebStorage", L"\\Default\\Cache", L"\\Default\\Code Cache", L"\\Default\\GPUCache", L"\\Default\\DawnGraphiteCache", L"\\Default\\DawnWebGPUCache", L"\\GrShaderCache", L"\\ShaderCache" }) RmTree(p + n);
+    for (const wchar_t* n : { L"\\Default\\Favicons", L"\\Default\\Favicons-journal", L"\\Default\\Web Data", L"\\Default\\Web Data-journal", L"\\Default\\Network Action Predictor", L"\\Default\\Network\\Network Persistent State", L"\\Default\\Network\\TransportSecurity", L"\\Default\\Network\\Reporting and NEL", L"\\Default\\Network\\Reporting and NEL-journal" }) DeleteFileW((p + n).c_str());
+    if (!keepCookies) for (const wchar_t* n : { L"\\Default\\Network\\Cookies", L"\\Default\\Network\\Cookies-journal" }) DeleteFileW((p + n).c_str());
+}
+
 void BrowserWindow::PrivSendStats(Tab* t) {
     if (!t->webView) return;
     long long site = PrivSiteBytes(), cache = PrivCacheBytes();
@@ -124,6 +131,7 @@ void BrowserWindow::PrivClear(Tab* t, const std::set<std::wstring>& keys, const 
         if (!parts.empty()) { msg += L" Removed "; for (size_t k = 0; k < parts.size(); ++k) msg += (k ? L", " : L"") + parts[k]; msg += L"."; }
         else if (run->failed.empty()) msg = L"<b>Done.</b> Nothing was left to clear.";
         if (run->cookAfter > 0) msg += L" " + std::to_wstring(run->cookAfter) + L" cookie(s) were set again by pages that are open: close or reload them and clear once more.";
+        if (m_wipeDone) { auto cb = std::move(m_wipeDone); m_wipeDone = nullptr; std::wstring fl; for (auto& f : run->failed) fl += (fl.empty() ? L"" : L", ") + f; cb(run->failed.empty(), fl); }   // Burn waits for this
         Tab* t = run->t; if (IndexOf(t) < 0 || !t->webView) return;
         std::wstring plain = msg; for (const wchar_t* tg : { L"<b>", L"</b>" }) { size_t p; while ((p = plain.find(tg)) != std::wstring::npos) plain.erase(p, wcslen(tg)); }
         if (t->url == L"libra://history") { t->webView->ExecuteScript((L"lbDone(" + std::to_wstring(run->since) + L"," + (run->keys.count(L"hist") ? L"1" : L"0") + L",'" + plain + L"')").c_str(), nullptr); return; }   // no page reload: the page removes the rows itself

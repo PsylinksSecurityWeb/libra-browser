@@ -28,7 +28,7 @@ Many free browsers pay for themselves with your data. Libra Browser doesn't. It 
 
 ---
 
-## New in this version (3.8.4, beta)
+## New in this version (3.9.0, beta)
 
 - **AI Assistant (beta, optional).** Bring your own API key. It can fill forms and read pages for you, asks before anything risky, never types passwords or card numbers, and never solves CAPTCHAs. **When the assistant is closed, the AI sees nothing**: nothing is read for it and nothing is sent.
 - **Auto suggest (optional, no AI, this PC only).** Click an empty name, e-mail, phone or company box and Libra Browser offers the matching value from your own saved notes in its own popup. It opens only after a real click or Tab key and never for passwords, user names, cards or ID numbers.
@@ -200,7 +200,7 @@ The very first time you open Libra Browser, you see only a short film, then a fe
 - Windows only. No phone version, no sync, and no extensions yet.
 - Importing bookmarks and history from other browsers is coming later.
 - The app isn't code-signed yet, so Windows may show a "publisher unknown" warning on first install.
-- The source code is viewable, but it is not open source. See the LICENSE file.
+- The source code is viewable, but it is open source under Apache-2.0. See the LICENSE file.
 - Some sites with strict CAPTCHAs may need Balanced or Off.
 - In Child Safety mode, site names are also checked with a public family service (CleanBrowsing). Libra Browser's own server will replace it later. It does not cover gambling sites yet. A person with administrator rights can still get around any app lock, so use a standard Windows account for children.
 
@@ -209,3 +209,9 @@ The very first time you open Libra Browser, you see only a short film, then a fe
 **Libra Browser. Secure, private and lightweight.**
 Built by Psylinks Security Private Limited, India.
 Source: https://github.com/PsylinksSecurityWeb/libra-browser
+
+## 3.9.0 privacy hardening
+- Sends the Global Privacy Control signal (Sec-GPC) on every request; strips 22 known tracking URL parameters.
+- Fewer readable device details: empty Client Hints, fixed audio latency, heap limit, CPU cores, screen availability, keyboard layout; hides contrast / reduced-motion / transparency preferences (switch in Settings); canvas font probing limited to common fonts (Max level); optional "Hide my time zone".
+- window.name is cleared when you move to another site.
+- Optional "Clear cookies, site data and cache at startup" with a "Stay signed in on" list (partitioned third-party cookies included).

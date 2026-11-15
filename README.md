@@ -2,7 +2,7 @@
 
 <h1 align="center">Libra Browser</h1>
 <p align="center"><b>Libra Browser is a security-focused Windows browser: secure, private and lightweight. It blocks ads and trackers before they ever load.</b><br>
-No account. No sync. No telemetry in Libra Browser's own code. Built by <b>Psylinks Security Private Limited</b>, an Indian company. Version 3.8.4 (beta), a private Windows browser with an optional AI browser agent.</p>
+No account. No sync. No telemetry in Libra Browser's own code. Built by <b>Psylinks Security Private Limited</b>, an Indian company. Version 3.9.0 (beta), a private Windows browser with an optional AI browser agent.</p>
 
 
 <p align="center"><a href="https://github.com/PsylinksSecurityWeb/libra-browser/releases"><strong>Download Libra Browser for Windows 10/11 (64-bit)</strong></a><br><sub>Installer and SHA-256 verification are on the release page. The beta is not code-signed yet.</sub></p>
@@ -21,7 +21,7 @@ The agent is designed for supervised browser automation: it does not type passwo
 
 ## How to get Libra Browser and what to expect on first launch
 
-Download Libra Browser only from the official [GitHub Releases page](https://github.com/PsylinksSecurityWeb/libra-browser/releases). When the 3.8.4 Windows installer is published, the release page will contain the single official `.exe` and its SHA-256 checksum. Do not download browser installers from mirrors, file-sharing sites, social-media links, or unofficial repackagers.
+Download Libra Browser only from the official [GitHub Releases page](https://github.com/PsylinksSecurityWeb/libra-browser/releases). When the 3.9.0 Windows installer is published, the release page will contain the single official `.exe` and its SHA-256 checksum. Do not download browser installers from mirrors, file-sharing sites, social-media links, or unofficial repackagers.
 
 The beta is not code-signed yet, so Windows may display **Unknown Publisher** or **Windows protected your PC**. Before proceeding, confirm that the filename and SHA-256 match the values shown on the official release page. If they match and you intentionally downloaded the file from the official GitHub release, select **More info → Run anyway**. If the checksum does not match, the file is renamed, or it came from another site, do not run it.
 
@@ -79,6 +79,14 @@ Explore the browser before installing: the gallery shows the start page, privacy
 - "Clear browsing data": tick boxes and a time range; each kind is cleared and checked, anything left is swept again, and the result shows real numbers or what failed. Your API key, bookmarks and saved logins are never touched
 - "Save videos" helper and right-click save for images, links and PDFs (off by default)
 - History, Bookmarks, Downloads, Tabs manager, pinned tabs, Light mode, set as default browser
+
+## New in Libra Browser 3.9.0 beta
+
+- **Screenshot capture:** save the visible page, a full page, or a selected area as a local PNG. Nothing is uploaded.
+- **Safer downloads:** risky downloaded programs are held behind Windows Security checks until you explicitly release them; supported Windows Sandbox inspection is available for held files.
+- **Ask before saving:** downloads and save helpers show a Windows Save dialog before fetching content.
+- **Privacy hardening:** optional Global Privacy Control, tracking-parameter stripping, UTC time-zone masking, window-name clearing across sites, and startup clearing with an explicit stay-signed-in list.
+- **Burn:** a clearly confirmed reset removes browsing data and assistant data; bookmarks, saved logins, settings, and the encrypted API key are intentionally retained.
 
 ## How Libra Browser is different
 | | **Libra Browser** | Chrome | Edge | Brave | Firefox | AVG Secure Browser |
@@ -156,7 +164,7 @@ Or open `LibraBrowser/LibraBrowser.vcxproj` and build **Release | x64**. Output:
 Settings groups and search, sensor and permission notices, offline spelling help, offline voice search, upstream proxy support for VPN and proxy users, code signing.
 
 ## FAQ
-**Is it open source?** It is *source available*. The code is public to read, but modifying, redistributing or selling it needs written permission.
+**Is it open source?** Yes. It is licensed under Apache-2.0; preserve the LICENSE, NOTICE, and required attribution information.
 
 **Why not an extension like uBlock Origin?** Libra Browser blocks one level lower (DNS), needs no extension and uses less memory. Libra Browser has no extension system by design.
 

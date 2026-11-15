@@ -34,7 +34,7 @@ Certificate errors cannot be bypassed silently (a Proceed button, per site, for 
 - The exe is not code-signed.
 - "Proceed anyway" on a bad certificate is the user's responsibility.
 
-## Audit 2026-11-15 (version 3.8.4, beta)
+## Audit 2026-11-15 (version 3.9.0, beta)
 - **Secrets:** the source, tests, docs and release files were searched for API-key patterns (OpenAI, Anthropic, Google, Groq, xAI, GitHub, bearer tokens). None found; the only match is an obviously fake test string. The user's API key lives only in an encrypted file (Windows DPAPI), is never shown, and is sent only to the provider the user chose. "Clear browsing data" never deletes it.
 - **Device details:** the code never reads the computer name, user name, hardware ids, disk serials or network adapters. Sites see one generic Windows identity that changes daily. The compiler's build-folder text is removed from the release exes.
 - **Test hooks:** the `LIBRA_TEST_*` environment variables used by our automated tests (auto-answering Agent questions, opening pages, picking files) now work only if a file named `libra-test.enabled` sits next to the exe. Release packages never contain it, so another program cannot use these variables to weaken a safety check.
@@ -44,12 +44,7 @@ Certificate errors cannot be bypassed silently (a Proceed button, per site, for 
 - **Ad paths are refused before the request:** a short reviewed list (no bare `/banners/` or single-word rules, so real pictures are not hit) in Max mode; checked on 10 large sites with zero false positives, and the real AdBlock Tester page scores 100/100.
 - **Menu crash fixed:** an empty menu entry could crash the browser when the menu was opened.
 
-## 3.8.4 agent review
 
-- API keys are stored using Windows DPAPI and are sent only to the configured endpoint. Redirects are disabled for model requests.
-- The assistant is disabled in private windows and Child Safety mode. Web pages cannot use the internal agent message channel.
-- File uploads are limited to files the user selects or copies into the agent sandbox.
-- The agent refuses password, card and one-time-code fields and pauses for human checks.
-- Permission and task scopes use exact hostnames rather than guessed registrable domains, avoiding cross-site permission sharing on public suffixes such as `github.io` and `co.uk`.
-- The optional voice pack is downloaded only on request and checked against pinned SHA-256 values before installation.
-- The agent remains beta software. Users should review every result and must not rely on it for financial, legal or safety-critical actions.
+## 3.9.0 release-scope review
+
+The 3.9.0 source was reviewed for embedded credentials, private files, risky download behavior, screenshot file handling, destructive reset behavior, and stale release metadata. Sponsored content remains disabled in the public build until a publisher-controlled endpoint and public signing keys are configured and independently verified.

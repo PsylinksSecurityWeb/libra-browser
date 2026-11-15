@@ -89,7 +89,7 @@ static DWORD WINAPI Worker(LPVOID) {
     Progress(88, L"Registering Libra Browser...");
     HKEY k;
     if (RegCreateKeyExW(HKEY_CURRENT_USER, kUninstKey, 0, nullptr, 0, KEY_WRITE, nullptr, &k, nullptr) == ERROR_SUCCESS) {
-        RegStr(k, L"DisplayName", kName); RegStr(k, L"DisplayVersion", L"3.8.4"); RegStr(k, L"Publisher", kCompany);
+        RegStr(k, L"DisplayName", kName); RegStr(k, L"DisplayVersion", L"3.9.0"); RegStr(k, L"Publisher", kCompany);
         RegStr(k, L"InstallLocation", g_dir); RegStr(k, L"DisplayIcon", exe);
         RegStr(k, L"UninstallString", L"\"" + g_dir + L"\\Uninstall.exe\" /uninstall");
         RegStr(k, L"URLInfoAbout", L"https://github.com/PsylinksSecurityWeb/libra-browser");
@@ -111,7 +111,7 @@ static LRESULT CALLBACK Proc(HWND h, UINT m, WPARAM w, LPARAM l) {
         g_fSmall = CreateFontW(-12, 0, 0, 0, FW_NORMAL, 0, 0, 0, DEFAULT_CHARSET, 0, 0, CLEARTYPE_QUALITY, 0, L"Segoe UI");
         auto mk = [&](const wchar_t* cls, const wchar_t* txt, DWORD st, int x, int y, int cw, int ch, HFONT f) { HWND c = CreateWindowExW(0, cls, txt, WS_CHILD | WS_VISIBLE | st, x, y, cw, ch, h, nullptr, nullptr, nullptr); SendMessageW(c, WM_SETFONT, (WPARAM)f, TRUE); return c; };
         mk(L"STATIC", kName, 0, 40, 36, 440, 48, g_fTitle);
-        mk(L"STATIC", L"Secure, private and lightweight. Version 3.8.4", 0, 42, 86, 440, 22, g_fText);
+        mk(L"STATIC", L"Secure, private and lightweight. Version 3.9.0", 0, 42, 86, 440, 22, g_fText);
         g_status = mk(L"STATIC", L"Starting...", 0, 42, 150, 440, 22, g_fText);
         g_bar = CreateWindowExW(0, PROGRESS_CLASSW, L"", WS_CHILD | WS_VISIBLE | PBS_SMOOTH, 42, 182, 436, 8, h, nullptr, nullptr, nullptr);
         SetWindowTheme(g_bar, L"", L""); SendMessageW(g_bar, PBM_SETBARCOLOR, 0, RGB(17, 17, 17)); SendMessageW(g_bar, PBM_SETBKCOLOR, 0, RGB(232, 232, 232));

@@ -19,9 +19,15 @@ static std::wstring UrlArg(PCWSTR cl) {   // first http(s) address on the comman
     return (u.rfind(L"http://", 0) == 0 || u.rfind(L"https://", 0) == 0) && u.size() < 2000 ? u : L"";
 }
 int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR lpCmdLine, int nCmdShow) {
+    // process hardening: no DLL from the current folder, abort on heap corruption, no DLLs from network shares or low-integrity folders
+    SetDefaultDllDirectories(LOAD_LIBRARY_SEARCH_DEFAULT_DIRS | LOAD_LIBRARY_SEARCH_SYSTEM32);
+    HeapSetInformation(nullptr, HeapEnableTerminationOnCorruption, nullptr, 0);
+    { PROCESS_MITIGATION_IMAGE_LOAD_POLICY ip{}; ip.NoRemoteImages = 1; ip.NoLowMandatoryLabelImages = 1; ip.PreferSystem32Images = 1; SetProcessMitigationPolicy(ProcessImageLoadPolicy, &ip, sizeof ip); }
     if (lpCmdLine && wcsstr(lpCmdLine, L"--register-default")) return RegisterAsBrowser() ? 0 : 1;
     // Single-instance: bring existing window to front if already running
-    HWND existing = TestEnv(L"LIBRA_TEST_MULTI", nullptr, 0) ? nullptr : FindWindowW(L"LibraBrowserWnd", nullptr);   // test hook: isolated test run beside a real window
+    HWND existing = nullptr;   // test hook LIBRA_TEST_MULTI: isolated test run beside a real window; a private window is always its own process
+    if (!(lpCmdLine && wcsstr(lpCmdLine, L"--incognito")) && !TestEnv(L"LIBRA_TEST_MULTI", nullptr, 0))
+        existing = FindWindowW(L"LibraBrowserWnd", nullptr);   // (private windows use class LibraBrowserWndP)
     if (existing) {
         ShowWindow(existing, SW_RESTORE);
         SetForegroundWindow(existing);

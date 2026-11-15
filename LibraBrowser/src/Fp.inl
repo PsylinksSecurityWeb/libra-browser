@@ -18,7 +18,7 @@ static bool CanUpgradeToHttps(const std::wstring& url) {   // public http:// pag
 static std::wstring StripTrackers(const std::wstring& url) {   // "" = nothing to strip. Fixed list of pure tracking parameters; login/OAuth parameters are never touched.
     size_t q = url.find(L'?'); if (q == std::wstring::npos) return L"";
     size_t h = url.find(L'#', q); std::wstring qs = url.substr(q + 1, (h == std::wstring::npos ? url.size() : h) - q - 1), out; bool cut = false; size_t i = 0;
-    static const wchar_t* bad[] = { L"fbclid", L"gclid", L"gclsrc", L"dclid", L"gbraid", L"wbraid", L"msclkid", L"mc_eid", L"mc_cid", L"igshid", L"yclid", L"twclid", L"ttclid", L"_hsenc", L"_hsmi", L"mkt_tok", L"vero_id", L"wickedid", L"oly_enc_id", L"oly_anon_id", L"__s", L"_ga", L"_gl" };
+    static const wchar_t* bad[] = { L"fbclid", L"gclid", L"gclsrc", L"dclid", L"gbraid", L"wbraid", L"msclkid", L"mc_eid", L"mc_cid", L"igshid", L"yclid", L"twclid", L"ttclid", L"_hsenc", L"_hsmi", L"mkt_tok", L"vero_id", L"wickedid", L"oly_enc_id", L"oly_anon_id", L"__s", L"_ga", L"_gl", L"__hsfp", L"__hssc", L"__hstc", L"_openstat", L"hsctatracking", L"ml_subscriber", L"ml_subscriber_hash", L"rb_clickid", L"s_cid", L"vero_conv" };   // compared in lower case
     while (i <= qs.size()) {
         size_t e = qs.find(L'&', i); if (e == std::wstring::npos) e = qs.size();
         std::wstring kv = qs.substr(i, e - i), k = kv.substr(0, kv.find(L'=')); for (auto& c : k) c = (wchar_t)towlower(c);
@@ -54,6 +54,7 @@ static bool FpDaily(int day, unsigned& a, unsigned& b) {
 void BrowserWindow::InstallFpScript(Tab* t) {
     if (!t->webView) return;
     if (!t->fpScriptId.empty()) { t->webView->RemoveScriptToExecuteOnDocumentCreated(t->fpScriptId.c_str()); t->fpScriptId.clear(); }
+    t->webView->CallDevToolsProtocolMethod(L"Emulation.setTimezoneOverride", (m_set.Get(L"fingerprint", L"1") != L"0" && m_set.On(L"tz_utc")) ? LR"({"timezoneId":"UTC"})" : LR"({"timezoneId":""})", nullptr);   // opt-in: Date and Intl both say UTC (empty = real time zone)
     if (m_set.Get(L"fingerprint", L"1") == L"0") return;
     unsigned keepA = 0, keepB = 0; FpDaily(0, keepA, keepB);   // day 0 = a value that never changes
     m_fpDay = StatDay(0); { wchar_t te[16]; if (TestEnv(L"LIBRA_TEST_DAY", te, 16)) m_fpDay = _wtoi(te); }   // test hook: pretend it is another day
@@ -64,17 +65,19 @@ void BrowserWindow::InstallFpScript(Tab* t) {
         std::wstring ua = L"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/" + M + L".0.0.0 Safari/537.36";
         wil::com_ptr<ICoreWebView2Settings> st; wil::com_ptr<ICoreWebView2Settings2> s2;
         if (SUCCEEDED(t->webView->get_Settings(&st)) && SUCCEEDED(st->QueryInterface(IID_PPV_ARGS(&s2)))) s2->put_UserAgent(ua.c_str());
-        std::wstring j = LR"({"userAgent":")" + ua + LR"(","acceptLanguage":"en-US","platform":"Win32","userAgentMetadata":{"brands":[{"brand":"Chromium","version":")" + M + LR"("},{"brand":"Not.A/Brand","version":"99"}],"fullVersionList":[{"brand":"Chromium","version":")" + M + LR"(.0.0.0"},{"brand":"Not.A/Brand","version":"99.0.0.0"}],"platform":"Windows","platformVersion":"10.0.0","architecture":"x86","model":"","mobile":false,"bitness":"64","wow64":false}})";
+        std::wstring j = LR"({"userAgent":")" + ua + LR"(","acceptLanguage":"en-US","platform":"Win32","userAgentMetadata":{"brands":[{"brand":"Chromium","version":")" + M + LR"("},{"brand":"Not.A/Brand","version":"99"}],"fullVersionList":[{"brand":"Chromium","version":")" + M + LR"(.0.0.0"},{"brand":"Not.A/Brand","version":"99.0.0.0"}],"platform":"Windows","platformVersion":"","architecture":"","model":"","mobile":false,"bitness":"","wow64":false}})";
         t->webView->CallDevToolsProtocolMethod(L"Emulation.setUserAgentOverride", j.c_str(), nullptr);
-        std::wstring hc = std::wstring(LR"({"hardwareConcurrency":)") + ((seedB & 1) ? L"8" : L"4") + L"}";
+        std::wstring hc = LR"({"hardwareConcurrency":4})";   // one constant value: privacytests.org passes a value that is the same on every machine
         t->webView->CallDevToolsProtocolMethod(L"Emulation.setHardwareConcurrencyOverride", hc.c_str(), nullptr);   // also reaches workers
+        t->webView->CallDevToolsProtocolMethod(L"Network.enable", L"{}", nullptr);
+        t->webView->CallDevToolsProtocolMethod(L"Network.setExtraHTTPHeaders", LR"({"headers":{"Sec-GPC":"1"}})", nullptr);   // Global Privacy Control: first and third parties are told "do not sell or share"
     }
     std::wstring allow = L"[", ball = L"[", maxl = L"[";
     for (auto& kv : m_modes) (kv.second == 2 ? allow : kv.second == 1 ? ball : maxl) += L"\"" + Esc(kv.first) + L"\",";
     allow += L"]"; ball += L"]"; maxl += L"]";
     std::wstring defs = std::to_wstring(_wtoi(m_set.Get(L"block_default", L"0").c_str()));
     std::wstring keepList; for (auto& k : m_keepId) keepList += L"\"" + Esc(k) + L"\",";
-    std::wstring js = L"(function(){var AL=" + allow + L",BL=" + ball + L",ML=" + maxl + L",DEF=" + defs + L",KP=[" + keepList + L"],SEEDK=" + std::to_wstring(keepA) + L",SEEDK2=" + std::to_wstring(keepB) + L",SEED=" + std::to_wstring(seedA) + L",SEED2=" + std::to_wstring(seedB) + L";" + LR"js(
+    std::wstring js = L"(function(){var AL=" + allow + L",BL=" + ball + L",ML=" + maxl + L",DEF=" + defs + L",KP=[" + keepList + L"],SEEDK=" + std::to_wstring(keepA) + L",SEEDK2=" + std::to_wstring(keepB) + L",SEED=" + std::to_wstring(seedA) + L",SEED2=" + std::to_wstring(seedB) + L",A11=" + (m_set.Get(L"fp_a11y", L"1") == L"0" ? L"0" : L"1") + L";" + LR"js(
 var th=location.hostname;if(location.protocol!='http:'&&location.protocol!='https:'){if(location.protocol!='about:'||window.top===window)return;try{th=window.top.location.hostname}catch(e){try{th=window.parent.location.hostname}catch(e2){return}}if(!th)return}
 try{if(window.top!==window&&location.ancestorOrigins&&location.ancestorOrigins.length)th=new URL(location.ancestorOrigins[location.ancestorOrigins.length-1]).hostname}catch(e){}
 function mt(L){for(var i=0;i<L.length;i++)if(th===L[i]||th.endsWith('.'+L[i]))return true;return false}
@@ -98,14 +101,26 @@ function wgl(P){var gp=P.getParameter;P.getParameter=function(p){if(FULL&&p===37
 try{wgl(WebGLRenderingContext.prototype);if(window.WebGL2RenderingContext)wgl(WebGL2RenderingContext.prototype)}catch(e){}
 try{var gcd=AudioBuffer.prototype.getChannelData,done=new WeakSet();AudioBuffer.prototype.getChannelData=function(){var d=gcd.apply(this,arguments);if(!done.has(d)){done.add(d);for(var i=0;i<d.length;i+=100)d[i]+=((Math.imul(i+S,2654435761)>>>0)%7-3)*1e-7}return d};
  var gf=AnalyserNode.prototype.getFloatFrequencyData;AnalyserNode.prototype.getFloatFrequencyData=function(a){gf.apply(this,arguments);for(var i=0;i<a.length;i+=7)a[i]+=((Math.imul(i+S,2654435761)>>>0)%5-2)*1e-4}}catch(e){}
-if(FULL){try{var hc=Object.getOwnPropertyDescriptor(Navigator.prototype,'hardwareConcurrency');Object.defineProperty(Navigator.prototype,'hardwareConcurrency',{get:function(){return (SEED2&1)?8:4},configurable:true});
+try{Object.defineProperty(Navigator.prototype,'globalPrivacyControl',{get:function(){return true},configurable:true,enumerable:true});
+ ['baseLatency','outputLatency'].forEach(function(k){[window.AudioContext,window.webkitAudioContext].forEach(function(C){if(C&&k in C.prototype)Object.defineProperty(C.prototype,k,{get:function(){return k=='baseLatency'?0.01:0},configurable:true})})})}catch(e){}
+if(FULL){try{
+ if('memory' in Performance.prototype||performance.memory)Object.defineProperty(Performance.prototype,'memory',{get:function(){return {jsHeapSizeLimit:4294705152,totalJSHeapSize:10000000,usedJSHeapSize:10000000}},configurable:true});
+ var sp=Screen.prototype;['availLeft','availTop'].forEach(function(k){if(k in sp)Object.defineProperty(sp,k,{get:function(){return 0},configurable:true})});
+ if(A11){var mm=window.matchMedia;window.matchMedia=function(q){q=String(q).replace(/\(\s*prefers-(contrast|reduced-motion|reduced-transparency)\s*:\s*(more|less|custom|reduce)\s*\)/g,'(width:-1px)').replace(/\(\s*prefers-(contrast|reduced-motion|reduced-transparency)\s*:\s*no-preference\s*\)/g,'(min-width:0px)');return mm.call(window,q)}}
+ try{var FA=/^(serif|sans-serif|monospace|cursive|fantasy|system-ui|ui-[a-z-]+|emoji|math|fangsong|arial|arial black|helvetica|helvetica neue|times|times new roman|courier|courier new|verdana|georgia|tahoma|trebuchet ms|segoe ui|segoe ui emoji|segoe ui symbol|calibri|cambria|consolas|impact|comic sans ms|lucida console|lucida sans unicode|palatino linotype|microsoft sans serif|sylfaen|webdings|wingdings|inherit|initial|unset)$/;var fd=Object.getOwnPropertyDescriptor(CanvasRenderingContext2D.prototype,'font');
+  function pf(v){v=String(v);var m=v.match(/^(.*?\d(?:\.\d+)?(?:px|pt|em|rem|%|ex|ch|vw|vh|vmin|vmax|cm|mm|in|pc)(?:\/\S+)?\s+)(.+)$/);if(!m)return v;var pg=null;var fs=m[2].split(',').map(function(s){return s.trim()}).filter(function(s){var n=s.replace(/^['"]|['"]$/g,'').toLowerCase();if(FA.test(n))return true;if(pg===null){pg={};try{document.fonts.forEach(function(f){pg[String(f.family).replace(/^['"]|['"]$/g,'').toLowerCase()]=1})}catch(e){}}return !!pg[n]});if(!fs.length)fs=['sans-serif'];return m[1]+fs.join(', ')}
+  Object.defineProperty(CanvasRenderingContext2D.prototype,'font',{get:fd.get,set:function(v){fd.set.call(this,pf(v))},configurable:true,enumerable:true})}catch(e){}
+ if(window.Keyboard&&navigator.keyboard){var US={Backquote:'`',Minus:'-',Equal:'=',BracketLeft:'[',BracketRight:']',Backslash:'\\',Semicolon:';',Quote:"'",Comma:',',Period:'.',Slash:'/',IntlBackslash:'\\'};for(var c=0;c<26;c++)US['Key'+String.fromCharCode(65+c)]=String.fromCharCode(97+c);for(var d=0;d<10;d++)US['Digit'+d]=''+d;
+  Keyboard.prototype.getLayoutMap=function(){return Promise.resolve(new Map(Object.keys(US).map(function(k){return [k,US[k]]})))}}
+}catch(e){}
+try{var hc=Object.getOwnPropertyDescriptor(Navigator.prototype,'hardwareConcurrency');Object.defineProperty(Navigator.prototype,'hardwareConcurrency',{get:function(){return 4},configurable:true});
  function ov(o,k,f){var d=Object.getOwnPropertyDescriptor(o,k);if(d&&d.get)Object.defineProperty(o,k,{get:function(){return f(d.get.call(this))},configurable:true})}
  ov(Navigator.prototype,'plugins',function(){return []});ov(Navigator.prototype,'mimeTypes',function(){return []});
  ov(Navigator.prototype,'languages',function(l){return Object.freeze([l[0]])});
- ['width','height','availWidth','availHeight'].forEach(function(k){ov(Screen.prototype,k,function(v){return Math.round(v/100)*100})});
+ ['width','height','availWidth','availHeight'].forEach(function(k){var src=k.replace('avail','').toLowerCase(),sd=Object.getOwnPropertyDescriptor(Screen.prototype,src);Object.defineProperty(Screen.prototype,k,{get:function(){return Math.round(sd.get.call(this)/100)*100},configurable:true})});
  if(window.NavigatorUAData){var bf=function(b){return b.filter(function(x){return !/WebView2|Edge/.test(x.brand)})};
   ov(NavigatorUAData.prototype,'brands',bf);var hev=NavigatorUAData.prototype.getHighEntropyValues;
-  NavigatorUAData.prototype.getHighEntropyValues=function(){return hev.apply(this,arguments).then(function(r){if(r.brands)r.brands=bf(r.brands);if(r.fullVersionList)r.fullVersionList=bf(r.fullVersionList);var f={platform:'Windows',platformVersion:'10.0.0',architecture:'x86',bitness:'64',model:'',wow64:false};for(var k in f)if(k in r)r[k]=f[k];return r})}}
+  NavigatorUAData.prototype.getHighEntropyValues=function(){return hev.apply(this,arguments).then(function(r){if(r.brands)r.brands=bf(r.brands);if(r.fullVersionList)r.fullVersionList=bf(r.fullVersionList);var f={platform:'Windows',platformVersion:'',architecture:'',bitness:'',model:'',wow64:false};for(var k in f)if(k in r)r[k]=f[k];return r})}}
  if(window.OffscreenCanvasRenderingContext2D){var og=OffscreenCanvasRenderingContext2D.prototype.getImageData;OffscreenCanvasRenderingContext2D.prototype.getImageData=function(){var r=og.apply(this,arguments);if(r.data.length<16000000)pert(r.data);return r}}
  var dm=Object.getOwnPropertyDescriptor(Navigator.prototype,'deviceMemory');if(dm)Object.defineProperty(Navigator.prototype,'deviceMemory',{get:function(){return 8},configurable:true})}catch(e){}
  try{if(window.MediaDeviceInfo)ov(MediaDeviceInfo.prototype,'label',function(){return ''});

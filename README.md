@@ -13,6 +13,12 @@ No account. No sync. No telemetry in Libra Browser's own code. Built by <b>Psyli
 >
 > **License:** open source under Apache-2.0. You may modify and redistribute it under the license terms; preserve the required copyright and NOTICE information. See [LICENSE](LICENSE).
 
+## AI browser agent (beta)
+
+Libra Browser includes an optional, **off-by-default AI browser agent**. Bring your own API key or connect a local Ollama model, then ask it to read pages, summarize research, fill forms from your notes, click controls, and upload files you explicitly place in its Files folder. It works inside the browser while you watch.
+
+The agent is designed for supervised browser automation: it does not type passwords, payment-card numbers, security codes, or CAPTCHA answers; it asks before submissions, downloads, navigation, and other risky actions; and it is disabled in private windows and Child Safety mode. Read the full [AI Agent guide](AGENT.md) before enabling this beta feature.
+
 ## Why Libra Browser
 - **Blocks ads and trackers at the DNS layer.** Every site name is looked up through our own DNS-over-HTTPS server, so trackers are refused *before* a connection exists. Less data, less CPU, faster pages.
 - **Three levels per site:** Off, Balanced, Max, one tap from the shield icon. Fix a broken site without turning protection off everywhere.

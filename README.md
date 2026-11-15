@@ -19,6 +19,22 @@ Libra Browser includes an optional, **off-by-default AI browser agent**. Bring y
 
 The agent is designed for supervised browser automation: it does not type passwords, payment-card numbers, security codes, or CAPTCHA answers; it asks before submissions, downloads, navigation, and other risky actions; and it is disabled in private windows and Child Safety mode. Read the full [AI Agent guide](AGENT.md) before enabling this beta feature.
 
+## How to get Libra Browser and what to expect on first launch
+
+Download Libra Browser only from the official [GitHub Releases page](https://github.com/PsylinksSecurityWeb/libra-browser/releases). When the 3.8.4 Windows installer is published, the release page will contain the single official `.exe` and its SHA-256 checksum. Do not download browser installers from mirrors, file-sharing sites, social-media links, or unofficial repackagers.
+
+The beta is not code-signed yet, so Windows may display **Unknown Publisher** or **Windows protected your PC**. Before proceeding, confirm that the filename and SHA-256 match the values shown on the official release page. If they match and you intentionally downloaded the file from the official GitHub release, select **More info → Run anyway**. If the checksum does not match, the file is renamed, or it came from another site, do not run it.
+
+The current Windows build uses a small per-user installer. It does not require administrator rights, does not silently change the Windows default browser, and installs under the user profile. After installation, Libra Browser runs as a normal user application.
+
+## Limitations to know before you switch
+
+Libra Browser currently supports **64-bit Windows 10 and Windows 11 only**. It is not supported on macOS, Linux, Windows 7, Windows 8, Windows XP, or 32-bit Windows. Do not try to bypass these limits with unofficial compatibility layers or repackaged builds; they have not been security-tested by Psylinks Security.
+
+This is beta software. Some sites, forms, downloads, privacy protections, and AI-agent workflows may have rough edges. The AI browser agent is optional and off by default; review its work and do not rely on it for financial, legal, medical, or other safety-critical decisions. Code signing is on the roadmap.
+
+The current release uses Microsoft WebView2. Psylinks Security is also working on an independent browser engine called **Iron**. Iron is future work, is not included in this beta, and should not be treated as an available replacement engine until an official release and security review are published.
+
 ## Why Libra Browser
 - **Blocks ads and trackers at the DNS layer.** Every site name is looked up through our own DNS-over-HTTPS server, so trackers are refused *before* a connection exists. Less data, less CPU, faster pages.
 - **Three levels per site:** Off, Balanced, Max, one tap from the shield icon. Fix a broken site without turning protection off everywhere.

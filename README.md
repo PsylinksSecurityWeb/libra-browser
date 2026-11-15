@@ -5,7 +5,7 @@
 No account. No sync. No telemetry in Libra Browser's own code. Built by <b>Psylinks Security Private Limited</b>, an Indian company. Version 3.8.4 (beta), a private Windows browser with an optional AI browser agent.</p>
 
 
-<p align="center"><a href="https://github.com/PsylinksSecurityWeb/libra-browser/releases/tag/v3.8.4-beta"><strong>Download Libra Browser 3.8.4 beta for Windows 10/11 (64-bit)</strong></a><br><sub>Installer and SHA-256 verification are on the release page. The beta is not code-signed yet.</sub></p>
+<p align="center"><a href="https://github.com/PsylinksSecurityWeb/libra-browser/releases"><strong>Download Libra Browser for Windows 10/11 (64-bit)</strong></a><br><sub>Installer and SHA-256 verification are on the release page. The beta is not code-signed yet.</sub></p>
 
 <p align="center"><a href="https://github.com/PsylinksSecurityWeb/libra-browser">Source code</a> · <a href="https://github.com/PsylinksSecurityWeb/libra-browser/issues">Issues</a> · <a href="https://github.com/PsylinksSecurityWeb/libra-browser/security/advisories/new">Report a vulnerability</a></p>
 

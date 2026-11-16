@@ -715,16 +715,23 @@ int BrowserWindow::AgDockIdx() const {
     for (int i = 0; i < (int)m_tabs.size(); ++i) if (m_tabs[i]->url == L"libra://agent") return i;
     return -1;
 }
+bool BrowserWindow::AgAllowedHere() const {   // the Assistant lives only beside the home screen or a web page, never beside Settings, History, Downloads, Privacy... (Libra's own pages)
+    if (m_activeTab < 0 || m_activeTab >= (int)m_tabs.size()) return false;
+    const std::wstring& u = m_tabs[m_activeTab]->url; return u.empty() || u == L"libra://home" || IsHttp(u);
+}
 void BrowserWindow::ApplyDock() {
     int ai = AgDockIdx(); ResizeWebViews();
     if (ai < 0 || ai == m_activeTab) return;
-    Tab* a = m_tabs[ai].get(); a->hiddenSince = 0; ResumeTab(a);
+    Tab* a = m_tabs[ai].get();
+    if (!AgAllowedHere()) { if (m_agRun) AgStop(L"Stopped: the Assistant works only on the home screen and web pages."); if (a->controller) a->controller->put_IsVisible(FALSE); return; }   // on one of Libra's own pages the panel is hidden (back on a web page it returns)
+    a->hiddenSince = 0; ResumeTab(a);
     if (a->controller) a->controller->put_IsVisible(TRUE);
 }
 void BrowserWindow::ToggleAgent() {
     if (m_child) return;   // Child Safety: no agent
     int ai = -1; for (int i = 0; i < (int)m_tabs.size(); ++i) if (m_tabs[i]->url == L"libra://agent") ai = i;
     if (ai >= 0 && m_agDock) { AgStop(nullptr); m_agDock = false; CloseTab(ai); ResizeWebViews(); if (m_hBtnAgent) InvalidateRect(m_hBtnAgent, nullptr, FALSE); return; }   // second click closes it
+    if (!AgAllowedHere() && ai != m_activeTab) return;   // not from Settings or any other page of Libra: only from the home screen or a web page
     if (ai < 0) { AgStop(nullptr); ShowInternal(L"libra://agent", false); }   // keeps the current tab active
     else if (ai == m_activeTab) for (int i = (int)m_tabs.size() - 1; i >= 0; --i) if (IsHttp(m_tabs[i]->url)) { SwitchTab(i); break; }
     m_agDock = true; ApplyDock();

@@ -2,7 +2,7 @@
 // libra://privacy : what Libra remembers, drawn as live bars; one button really deletes it.
 #include "Pages.h"
 
-inline std::wstring PrivacyPage(bool grey, bool isDefault) {
+inline std::wstring PrivacyPage(bool grey, bool isDefault, const Settings& st) {
     std::wstring b = LR"H(<style>
 .hero{display:flex;gap:28px;align-items:center;padding:26px 28px;flex-wrap:wrap}
 .big{font:800 56px 'Segoe UI Variable Display','Segoe UI',sans-serif;letter-spacing:-.03em;line-height:1}
@@ -20,6 +20,11 @@ inline std::wstring PrivacyPage(bool grey, bool isDefault) {
 .bars{display:flex;gap:10px;align-items:flex-end;height:150px}.bars>div{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;font-size:12px;color:var(--mute)}
 .bars .st{width:100%;max-width:56px;display:flex;flex-direction:column-reverse;border-radius:8px;overflow:hidden;gap:1px;min-height:3px;background:#eee;transition:height .8s cubic-bezier(.2,.7,.2,1)}.bars .st b{display:block}
 .tr{display:grid;grid-template-columns:1fr 120px 52px;gap:12px;align-items:center;padding:7px 4px;font-size:13px}.tr .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.tr .bar{height:5px;border-radius:3px}.tr .n{text-align:right;font-variant-numeric:tabular-nums;color:var(--mute)}
+.snp{background:#f5f5f5;border-radius:14px;padding:14px 16px;font:12px/1.55 Consolas,"Cascadia Mono",monospace;white-space:pre-wrap;word-break:break-all;margin:8px 0;max-height:260px;overflow:auto}
+.snl div{display:flex;justify-content:space-between;gap:12px;padding:5px 2px;font-size:13px;border-bottom:1px solid #f0f0f0}.snl .bad{color:#d6141c}
+.card .row{padding:15px 0;gap:28px;min-height:62px;border-top:1px solid #f0f0f0;align-items:center}.card .row:first-child{border-top:0}.card .row>div:first-child{flex:1;min-width:0}.card .row small{max-width:none;margin-top:2px;font-size:13px;line-height:1.45}.lbl{font-size:15px;font-weight:500;display:block}.card:has(.lg){padding-top:16px;padding-bottom:14px}
+.foot{color:var(--mute);font-size:13px;padding:0 0 14px;margin:-2px 0 0}
+details.info{border-top:1px solid #f0f0f0}details.info summary{list-style:none;cursor:pointer;display:flex;justify-content:space-between;align-items:center;padding:15px 0;font-size:15px;font-weight:500}details.info summary::-webkit-details-marker{display:none}details.info summary::after{content:"";width:7px;height:7px;border-right:2px solid #aaa;border-bottom:2px solid #aaa;transform:rotate(45deg);margin-right:4px;transition:transform .2s}details.info[open] summary::after{transform:rotate(-135deg)}details.info .body{padding:0 0 16px;color:#777;font-size:13px;line-height:1.6}
 .pulse{animation:pop .5s}@keyframes pop{40%{transform:scale(1.04)}}
 </style>
 <h1>Privacy</h1>
@@ -31,6 +36,12 @@ inline std::wstring PrivacyPage(bool grey, bool isDefault) {
 <h2>Protection report</h2>
 <div class=card><div class=lg><span><i style="background:#E5484D"></i>Ads</span><span><i style="background:#F5A524"></i>Trackers</span><span><i style="background:#3E7BFA"></i>Analytics</span><span><i style="background:#8E4EC6"></i>Social</span><small>types are estimated from server names</small></div>
 <div class=bars id=bars></div><h3 style="margin:22px 0 6px;font-size:14px">Top blocked servers <small style="color:var(--mute);font-weight:400">last 90 days</small></h3><div id=top></div></div>
+<h2>What Libra sends</h2>
+<div class=card>)H" + ToggleOn(st, L"sn_count", L"Anonymous counts", L"Shown and clicked counts for sponsored items, and rounded totals of blocked ads and trackers") + LR"H(
+<p class=foot id=snoff style="display:none">Sponsored content is not active in this version, so Libra sends nothing.</p>
+<details class=info id=sn2><summary>See the next report and what was sent</summary><div class=body><p id=snd></p><pre class=snp id=snp></pre>
+<div class=go style="margin:10px 0 14px"><button id=snsend>Send now</button><button id=snclr>Discard these counts</button></div><div class=snl id=snl></div>
+<p style="margin-top:12px">No id, cookie, address or history. Every report has the same size. Your IP address is visible to the network while it travels; it is not stored in the report.</p></div></details></div>
 <h2>What Libra remembers</h2>
 <div class=card>)H";
     struct R { const wchar_t *k, *t, *d, *col; };
@@ -48,7 +59,7 @@ inline std::wstring PrivacyPage(bool grey, bool isDefault) {
         b += std::wstring(L"<div class=pr><i class=fill id=m_") + r.k + L" style=\"background:" + r.col + L"\"></i><div class=t><b>" + r.t + L"</b><small>" + r.d +
              L"</small></div><div class=v id=v_" + r.k + L">0</div><input class=cb type=checkbox id=c_" + r.k + L" checked></div>";
     b += LR"H(</div>
-<h2>Default browser</h2><div class=card><div class=row><div>Make Libra your default browser<small id=dsub>)H" + std::wstring(isDefault ? L"Libra is your default browser." : L"Windows asks you to confirm the choice in Settings.") +
+<h2>Default browser</h2><div class=card><div class=row><div><span class=lbl>Make Libra your default browser</span><small id=dsub>)H" + std::wstring(isDefault ? L"Libra is your default browser." : L"Windows asks you to confirm the choice in Settings.") +
          L"</small></div><button class=pri data-c=default.set>" + (isDefault ? L"Open settings" : L"Set as default") + L"</button></div></div>"
          L"<p class=hint style=\"color:var(--mute);font-size:12px;margin:12px 6px\">Saved passwords, bookmarks, settings and your API key are never touched here. Everything stays on this PC.</p>";
     std::wstring js = LR"H(
@@ -70,7 +81,7 @@ document.getElementById('rg').addEventListener('click',e=>{const b=e.target.clos
 $('#go').onclick=()=>{const ks=KEYS.filter(k=>$('#c_'+k).checked);if(!ks.length){$('#msg').textContent='Pick something to clear.';return}
  $('#go').disabled=true;$('#go').textContent='Clearing...';$('#msg').style.opacity=.4;P('priv.clear',ks.join(','),range)};
 const CC=['#E5484D','#F5A524','#3E7BFA','#8E4EC6'],CN=['Ads','Trackers','Analytics','Social'];
-function lbReport(r){const mx=Math.max(1,...r.days.map(d=>d[1]+d[2]+d[3]+d[4])),B=$('#bars');B.textContent='';
+function lbReport(r){const mx=Math.max(1,...r.days.map(d=>d[1]+d[2]+d[3]+d[4])),B=$('#bars');B.textContent='';B.style.display=r.days.every(d=>!(d[1]+d[2]+d[3]+d[4]))?'none':'flex';
  r.days.forEach(d=>{const t=d[1]+d[2]+d[3]+d[4],c=document.createElement('div'),s=document.createElement('div');s.className='st';s.title=t+' blocked: '+CN.map((n,i)=>n+' '+d[i+1]).join(', ');
   s.style.height='0';requestAnimationFrame(()=>requestAnimationFrame(()=>s.style.height=(t?Math.max(3,Math.round(120*t/mx)):3)+'px'));
   for(let i=0;i<4;i++)if(d[i+1]){const b=document.createElement('b');b.style.background=CC[i];b.style.height=(100*d[i+1]/t)+'%';s.appendChild(b)}
@@ -79,7 +90,14 @@ function lbReport(r){const mx=Math.max(1,...r.days.map(d=>d[1]+d[2]+d[3]+d[4])),
  const m=r.top[0][2];r.top.forEach(x=>{const row=document.createElement('div');row.className='tr';const nm=document.createElement('span');nm.className='nm';const i=document.createElement('i');i.style.background=CC[x[1]];nm.append(i,x[0]);
   const w=document.createElement('div'),bar=document.createElement('div');bar.className='bar';bar.style.background=CC[x[1]];bar.style.width=Math.max(4,100*x[2]/m)+'%';w.appendChild(bar);
   const n=document.createElement('span');n.className='n';n.textContent=x[2].toLocaleString();row.append(nm,w,n);T.appendChild(row)})}
-P('priv.stats','');
+function lbSn(s){const on=s.cfg&&s.on;$('#sn2').style.display=s.cfg?'block':'none';$('#snoff').style.display=s.cfg?'none':'block';$('#snd').textContent=!s.cfg?'Sponsored content is not active in this version, so Libra sends nothing.':on?'The next report, exactly as it would be sent (once a day at a random moment, only if there is something to report):':'Counting is off. Nothing is sent.';
+ $('#snp').style.display=on?'block':'none';$('#snp').textContent=on?s.next.replace(/,\{/g,',\n {').replace(/"b":/,'\n"b":').replace(/,"pad"/,'\n,"pad"'):'';
+ $('#snsend').disabled=!on||s.busy;$('#snclr').disabled=!on;const L=$('#snl');L.textContent='';
+ if(!s.log.length){L.textContent=s.cfg?'Nothing sent yet.':'';L.style.color='var(--mute)';return}
+ s.log.slice().reverse().forEach(g=>{const r=document.createElement('div'),a=document.createElement('span'),b=document.createElement('span');a.textContent=new Date(g[0]*1000).toLocaleString()+' . '+(g[1]==='report'?'Count report':'Sponsored list');b.textContent=g[2]+' bytes . '+(g[3]?'sent':'failed');if(!g[3])b.className='bad';r.append(a,b);L.appendChild(r)})}
+$('#snsend').onclick=()=>P('priv.snsend','');$('#snclr').onclick=()=>P('priv.snclear','');
+document.addEventListener('change',e=>{if(e.target.dataset&&e.target.dataset.k==='sn_count')setTimeout(()=>P('priv.sn',''),250)});
+P('priv.stats','');P('priv.sn','');
 )H";
     return PageShell(L"Privacy", b, grey, js, L"privacy");
 }

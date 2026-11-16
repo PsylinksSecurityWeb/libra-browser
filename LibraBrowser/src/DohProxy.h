@@ -161,7 +161,7 @@ private:
     // One DoH query. Returns false on transport failure. rcode/addrs/ttl filled on success.
     bool Query(const std::string& host, int qtype, int& rcode, std::vector<Addr>& out, int& ttl, HINTERNET con = nullptr, const wchar_t* pth = nullptr) {
         std::string q; size_t s;
-        q.assign("\0\0\1\0\0\1\0\0\0\0\0\0", 12);
+        q.assign("\0\0\1\0\0\1\0\0\0\0\0\1", 12);   // id 0 (RFC 8484), one extra record: the EDNS padding below
         for (s = 0;;) {
             size_t e = host.find('.', s); if (e == std::string::npos) e = host.size();
             if (e == s || e - s > 63) return false;
@@ -169,6 +169,9 @@ private:
             if (e >= host.size()) break; s = e + 1;
         }
         q.push_back(0); q.push_back(0); q.push_back((char)qtype); q.push_back(0); q.push_back(1);
+        { size_t pad = (128 - (q.size() + 15) % 128) % 128;   // EDNS0 padding (RFC 7830/8467): every query is a multiple of 128 bytes, so its length does not hint at the name. No client-subnet option is ever sent.
+          const unsigned char o[] = { 0, 0, 41, 0x04, 0xD0, 0, 0, 0, 0, (unsigned char)((pad + 4) >> 8), (unsigned char)(pad + 4), 0, 12, (unsigned char)(pad >> 8), (unsigned char)pad };
+          q.append((const char*)o, sizeof o); q.append(pad, '\0'); }
 
         static const char* T = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
         std::string b64;

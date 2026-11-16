@@ -2,7 +2,7 @@
 
 <h1 align="center">Libra Browser</h1>
 <p align="center"><b>Libra Browser is a security-focused Windows browser: secure, private and lightweight. It blocks ads and trackers before they ever load.</b><br>
-No account. No sync. No telemetry in Libra Browser's own code. Built by <b>Psylinks Security Private Limited</b>, an Indian company. Version 3.9.0 (beta), a private Windows browser with an optional AI browser agent.</p>
+No account. No sync. No telemetry in Libra Browser's own code. Built by <b>Psylinks Security Private Limited</b>, an Indian company. Version 3.9.2 (beta), a private Windows browser with an optional AI browser agent.</p>
 
 
 <p align="center"><a href="https://github.com/PsylinksSecurityWeb/libra-browser/releases"><strong>Download Libra Browser for Windows 10/11 (64-bit)</strong></a><br><sub>Installer and SHA-256 verification are on the release page. The beta is not code-signed yet.</sub></p>
@@ -21,7 +21,7 @@ The agent is designed for supervised browser automation: it does not type passwo
 
 ## How to get Libra Browser and what to expect on first launch
 
-Download Libra Browser only from the official [GitHub Releases page](https://github.com/PsylinksSecurityWeb/libra-browser/releases). When the 3.9.0 Windows installer is published, the release page will contain the single official `.exe` and its SHA-256 checksum. Do not download browser installers from mirrors, file-sharing sites, social-media links, or unofficial repackagers.
+Download Libra Browser only from the official [GitHub Releases page](https://github.com/PsylinksSecurityWeb/libra-browser/releases). When the 3.9.2 Windows installer is published, the release page will contain the single official `.exe` and its SHA-256 checksum. Do not download browser installers from mirrors, file-sharing sites, social-media links, or unofficial repackagers.
 
 The beta is not code-signed yet, so Windows may display **Unknown Publisher** or **Windows protected your PC**. Before proceeding, confirm that the filename and SHA-256 match the values shown on the official release page. If they match and you intentionally downloaded the file from the official GitHub release, select **More info → Run anyway**. If the checksum does not match, the file is renamed, or it came from another site, do not run it.
 
@@ -80,7 +80,7 @@ Explore the browser before installing: the gallery shows the start page, privacy
 - "Save videos" helper and right-click save for images, links and PDFs (off by default)
 - History, Bookmarks, Downloads, Tabs manager, pinned tabs, Light mode, set as default browser
 
-## New in Libra Browser 3.9.0 beta
+## New in Libra Browser 3.9.2 beta
 
 - **Screenshot capture:** save the visible page, a full page, or a selected area as a local PNG. Nothing is uploaded.
 - **Safer downloads:** risky downloaded programs are held behind Windows Security checks until you explicitly release them; supported Windows Sandbox inspection is available for held files.
@@ -95,7 +95,7 @@ Explore the browser before installing: the gallery shows the start page, privacy
 | Ad/tracker blocking built in | Yes, DNS-level, 3 levels per site | No (extensions) | Tracking prevention | Yes (Shields) | Yes (Enhanced Tracking Protection) | Yes (ad blocker) |
 | Account / sync needed | None, no sync at all | Optional | Optional | Optional | Optional | Not required |
 | Telemetry in the app's own code | None | Yes, can be limited | Yes, can be limited | Minimal, can be limited | Yes, can be limited | See vendor policy |
-| Source code | Source available (read-only) | Chromium open, Chrome closed | Closed | Open (MPL-2.0) | Open (MPL-2.0) | Closed |
+| Source code | Open source (Apache-2.0) | Chromium open, Chrome closed | Closed | Open (MPL-2.0) | Open (MPL-2.0) | Closed |
 | Extensions | No (by design) | Yes | Yes | Yes | Yes | Yes |
 | Platforms | Windows 10/11 | All | All | All | All | Windows, macOS, mobile |
 | Antivirus included | No | No | No | No | No | Sold alongside AVG products |

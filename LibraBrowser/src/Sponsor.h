@@ -92,6 +92,13 @@ inline bool SpId(const std::string& s) { if (s.size() < 3 || s.size() > 40 || !(
 inline long long SpNum(const std::string& s) { if (s.empty() || s.size() > 12) return -1; long long v = 0; for (char c : s) { if (c < '0' || c > '9') return -1; v = v * 10 + (c - '0'); } return v; }
 
 // Parses and checks a feed envelope. base = "https://host" (no slash): every link and picture must live there.
+// The advertiser address the tile opens directly: https only, a real host name, no login part, no port, no odd characters.
+inline bool SpGoOk(const std::string& u) {
+    if (u.size() < 12 || u.size() > 500 || u.rfind("https://", 0) != 0) return false;
+    for (unsigned char c : u) if (c <= 0x20 || c >= 0x7f || c == '\\' || c == '"' || c == '<' || c == '>') return false;
+    size_t e = u.find_first_of("/?#", 8); std::string a = u.substr(8, e == std::string::npos ? std::string::npos : e - 8);
+    return !a.empty() && a.find('@') == std::string::npos && a.find(':') == std::string::npos && a.find('.') != std::string::npos && a.front() != '.' && a.back() != '.';
+}
 // Returns "" when fine, else a short reason. Does NOT check the clock or seq: the caller does (expires, rollback).
 inline std::string SpParse(const std::string& env, const std::string& base, const std::vector<SpKeyA>& keys, SpFeed& out) {
     out = SpFeed(); if (env.size() > 262144) return "too big";
@@ -112,10 +119,10 @@ inline std::string SpParse(const std::string& env, const std::string& base, cons
         SpWs(js, q); if (q < js.size() && js[q] == ']') break; if (q < js.size() && js[q] == ',') { ++q; continue; }
         std::map<std::string, std::string> m; if (!SpObject(js, q, m)) return "bad item";
         if (out.items.size() >= 40) return "too many items";
-        SpItem x; x.id = m["id"]; x.kind = m["kind"]; x.title = m["title"]; x.advertiser = m["advertiser"]; x.dest = m["dest"]; x.click = m["click"]; x.img = m["img"];
+        SpItem x; x.id = m["id"]; x.kind = m["kind"]; x.title = m["title"]; x.advertiser = m["advertiser"]; x.dest = m["dest"]; x.click = m["go"]; x.img = m["img"];
         x.start = SpNum(m["start"]); x.end = SpNum(m["end"]); long long w = SpNum(m["weight"]); x.weight = (w < 1 || w > 10) ? 1 : (int)w;
         if (!SpId(x.id) || (x.kind != "tile" && x.kind != "background") || x.title.empty() || x.title.size() > 120 || x.advertiser.empty() || x.advertiser.size() > 120 || x.start < 0 || x.end <= x.start) return "bad item fields";
-        if (x.click != base + "/c/" + x.id) return "click link outside the feed host";
+        if (!SpGoOk(x.click)) return "bad advertiser address";
         if (!x.img.empty() && x.img.rfind(base + "/img/", 0) != 0) return "picture outside the feed host";
         if (x.kind == "background" && x.img.empty()) return "background without picture";
         for (size_t i = 0; i + 1 < m["countries"].size(); ++i) { char a = m["countries"][i], b = m["countries"][i + 1]; if (a >= 'A' && a <= 'Z' && b >= 'A' && b <= 'Z' && x.countries.size() < 60) { x.countries.push_back(std::string{ a, b }); ++i; } }

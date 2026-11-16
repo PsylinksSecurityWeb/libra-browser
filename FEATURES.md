@@ -24,15 +24,15 @@ Libra Browser is a free, security-focused web browser for Windows that does one 
 
 ## Why free and private can go together
 
-Many free browsers pay for themselves with your data. Libra Browser doesn't. It is made by a security company, Psylinks Security Private Limited, that builds privacy tools. Libra Browser has no tracking and no account system to feed. Optional, clearly labelled sponsored links and a sponsored picture can appear on the new-tab page. They are chosen on your PC, nothing about you is sent, and one click in Settings turns them off. You are not the product.
+Many free browsers pay for themselves with your data. Libra Browser doesn't. It is made by a security company, Psylinks Security Private Limited, that builds privacy tools. Libra Browser has no tracking and no account system to feed. Clearly labelled sponsored links and a sponsored picture can appear on the new-tab page. They are chosen on your PC, nothing about you is sent, they are never shown in private windows or Child Safety mode, and each can be hidden. You are not the product.
 
 ---
 
-## New in this version (3.9.0, beta)
+## New in this version (3.9.2, beta)
 
 - **AI Assistant (beta, optional).** Bring your own API key. It can fill forms and read pages for you, asks before anything risky, never types passwords or card numbers, and never solves CAPTCHAs. **When the assistant is closed, the AI sees nothing**: nothing is read for it and nothing is sent.
 - **Auto suggest (optional, no AI, this PC only).** Click an empty name, e-mail, phone or company box and Libra Browser offers the matching value from your own saved notes in its own popup. It opens only after a real click or Tab key and never for passwords, user names, cards or ID numbers.
-- **Sponsored content (optional, off in one click).** A few clearly labelled links and one picture on the new-tab page, hand-approved, signed, no tracking. Settings > Privacy > Show sponsored content.
+- **Sponsored content (it supports Libra).** A few clearly labelled links and one picture on the new-tab page, hand-approved, signed, no tracking.
 - **Ad banners on a site's own server are blocked before they load.** Besides the cloud name list, a short reviewed list of ad paths (such as `/ads/banners/`, `_ads_banner.` file names and Flash files) is refused in Max mode before the request is sent, and what is left (broken pictures, empty Flash boxes) is removed. The AdBlock Tester score went from 78 to 100.
 - **Clear browsing data really clears, and tells you the truth.** Tick boxes with a time range (last hour to all time). Each kind (history, cookies and sign-in data, site data, cached files) is cleared and checked; anything left is swept again; the result line shows real numbers ("Removed 8 cookies, 1.0 MB of cached files...") or says what could not be cleared. GPU, shader and code caches are removed at the next start. Your API key, bookmarks and saved logins are never touched.
 - **Settings on one vertical page** and a **Beta** label, because small errors can still happen and we improve it every day.
@@ -200,7 +200,7 @@ The very first time you open Libra Browser, you see only a short film, then a fe
 - Windows only. No phone version, no sync, and no extensions yet.
 - Importing bookmarks and history from other browsers is coming later.
 - The app isn't code-signed yet, so Windows may show a "publisher unknown" warning on first install.
-- The source code is viewable, but it is open source under Apache-2.0. See the LICENSE file.
+- The source code is open source under Apache-2.0. Preserve the LICENSE, NOTICE, and required attribution information.
 - Some sites with strict CAPTCHAs may need Balanced or Off.
 - In Child Safety mode, site names are also checked with a public family service (CleanBrowsing). Libra Browser's own server will replace it later. It does not cover gambling sites yet. A person with administrator rights can still get around any app lock, so use a standard Windows account for children.
 
@@ -210,7 +210,19 @@ The very first time you open Libra Browser, you see only a short film, then a fe
 Built by Psylinks Security Private Limited, India.
 Source: https://github.com/PsylinksSecurityWeb/libra-browser
 
-## 3.9.0 privacy hardening
+## 3.9.2 reading, PDFs and a calmer first run
+- **Reader mode (F9):** a clean, text-only view of an article. Pictures and scripts of the site never load in it, and it opens only from F9 on a web page.
+- **PDFs:** downloaded PDFs open in the browser's own PDF viewer in a new tab. "Sign a PDF" (Ctrl+Shift+F) fills in and signs a PDF on this PC and saves a signed copy; the original is never changed. Its two open-source tools (pdf.js, pdf-lib) are downloaded once, on request, and checked against a fixed checksum.
+- **Bookmarks:** import from Chrome, Edge, Brave, Firefox or a file; encrypted backup and restore of bookmarks and a few safe settings (never passwords, history or the Assistant key).
+- **Updates:** a weekly check for a newer version of a signed manifest; it never installs by itself and asks first.
+- **Max mode:** common empty ad boxes are hidden too.
+- **First run:** shorter, resumes at the default-browser step if closed early, a plain summary of what Libra Browser protects and sends (SENDS.md), an optional bookmark import, and one dismissible tip on the new-tab page.
+- **Pages:** Settings, History, Downloads, Bookmarks, Passwords, Privacy and the PDF page share one calmer layout; the address-bar suggestions are tighter.
+- **Assistant:** it opens only beside the home screen or a web page, never on Settings or other Libra pages.
+
+---
+
+## 3.9.1 privacy hardening
 - Sends the Global Privacy Control signal (Sec-GPC) on every request; strips 22 known tracking URL parameters.
 - Fewer readable device details: empty Client Hints, fixed audio latency, heap limit, CPU cores, screen availability, keyboard layout; hides contrast / reduced-motion / transparency preferences (switch in Settings); canvas font probing limited to common fonts (Max level); optional "Hide my time zone".
 - window.name is cleared when you move to another site.

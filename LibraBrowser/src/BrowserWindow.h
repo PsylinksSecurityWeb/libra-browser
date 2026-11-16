@@ -5,6 +5,9 @@
 #include "AdBlocker.h"
 #include "Data.h"
 #include "Sponsor.h"
+#include "Signals.h"
+#include "Update.h"
+#include "Import.h"
 #include "Suggest.h"
 #include "AdRules.h"
 #include "Vault.h"
@@ -76,6 +79,11 @@ private:
     bool OnSetCursor(HWND hwnd, UINT hitTest);
     void OnTimer(UINT_PTR id);
     void HoldBegin(int i); void HoldDone(void* p); bool HoldRelease(int i); bool HoldSandbox(int i); void HoldSandboxCleanup(); std::wstring m_riskNote;   // download quarantine (Hold.inl)
+    UpInfo m_up; bool m_upBusy = false; void UpLoad(); void UpKick(bool force = false); void UpGot(void* r); void UpAct(const std::wstring& what); void UpReady(void* r); std::wstring UpHtml();   // update notifier (Update.inl)
+    std::vector<std::pair<std::wstring, std::wstring>> m_impSet; void OnBackup(int idx, const std::vector<std::wstring>& v);   // encrypted backup (Backup.inl)
+    ImList m_imp; void OnImport(int idx, const std::wstring& c, const std::wstring& a); void OnboardImport(int idx, const std::wstring& a);   // bookmark import (Import.inl)
+    bool m_pdfBusy = false; void PdfMapTools(Tab* t); void OnPdf(int idx, const std::vector<std::wstring>& v); void PdfToolsGot(void* r);   // PDF fill and sign (Pdf.inl)
+    std::wstring m_readerRaw; void OpenReader();   // reader mode (F9, Reader.inl)
     void OpenShot(); bool ShotKey(UINT vk); bool ShotTimer(UINT_PTR id);   // Screenshot (Shot.inl)
     void Burn();                       // hamburger: Burn (Burn.inl)
     bool BurnTimer(UINT_PTR id);
@@ -151,7 +159,7 @@ private:
     void StartSave(Tab* t, const std::wstring& url, const std::wstring& nameBase, const std::wstring& extHint, bool useTitle); void StartSaveTo(Tab* t, const std::wstring& url, const std::wstring& path); void OnVideoProbe(std::shared_ptr<DlJob> job, bool ok);
     std::map<DlJob*, std::shared_ptr<DlJob>> m_vidJobs;
     void DlPush(); void ApplyMemoryLevels();
-    void InstallFpScript(Tab* t); unsigned m_fpSeed = 0; int m_fpDay = 0; std::set<std::wstring> m_httpOk;
+    void InstallFpScript(Tab* t); unsigned m_fpSeed = 0; int m_fpDay = 0; std::set<std::wstring> m_httpOk; std::set<std::wstring> m_pdfAllow;   // exact file: addresses of downloaded PDFs the user asked to read (lowercase)
     void PrivSendStats(Tab* t);
     void StatLoad(); void StatSave(); void PrivSendReport(Tab* t);
     std::map<std::pair<int, std::string>, int> m_stat; bool m_statDirty = false, m_statLoaded = false;   // (day yyyymmdd, host) -> blocked requests, kept 90 days in stats.txt
@@ -160,7 +168,7 @@ private:
     void PrivClear(Tab* t, const std::set<std::wstring>& keys, const std::wstring& range);
     void OnPrivPage(int idx, const std::vector<std::wstring>& v);
     void OnAgentPage(int idx, const std::vector<std::wstring>& v); void AgentOnLlm(unsigned gen, const std::wstring& text); void AgSend(const std::wstring& js); void AgStop(const wchar_t* why); int AgTarget() const; void AgRunAct(int ti, const std::wstring& op, const std::wstring& id, const std::wstring& tx, bool ok);
-    void ToggleAgent(); void ApplyDock(); int AgDockIdx() const; bool m_agDock = false;
+    void ToggleAgent(); void ApplyDock(); bool AgAllowedHere() const; int AgDockIdx() const; bool m_agDock = false;
     void AgFileHook(bool on); void AgFileChosen(void* p); void AgGoNow(); bool m_agPaused = false; bool AgAsk(const std::wstring& cat, const std::wstring& dom, const std::wstring& title, const std::wstring& detail, bool once); void AgClickCheck(); std::wstring m_agClickId, m_agFp; int m_agRetried = 0; std::wstring m_agAttach; std::wstring m_agTaskRaw; std::set<std::wstring> m_agTypeOk; int m_agFcN = 0; void VoiceCmd(const std::wstring& a, const std::wstring& b); void OnVoiceMsg(void* p); bool m_agConv = false; Tab* m_agHome = nullptr; Tab* m_agRes = nullptr; int m_agTabs = 0; void AgKeyChecked(const std::wstring& r); void AgClickNow(); int m_agClickX = 0, m_agClickY = 0; Tab* m_agClickTab = nullptr; int m_agTry = 0, m_agClickRid = 0; wil::com_ptr<ICoreWebView2Frame2> m_agClickFrame; void AgNextStrategy(); void AgExecT(const wchar_t* js, ICoreWebView2ExecuteScriptCompletedHandler* h); EventRegistrationToken m_agFcTok{}; Tab* m_agFcTab = nullptr; Tab* m_agGoTab = nullptr; std::wstring m_agTaskKey, m_agGoUrl;
     bool m_agRun = false; unsigned m_agGen = 0; int m_agSteps = 0; DWORD m_agStart = 0; Tab* m_agTarget = nullptr; std::wstring m_agScope;   // Agent.inl
     void SetAsDefault();
@@ -221,7 +229,9 @@ private:
     // Auto suggest (Suggest.inl)
     bool SgOn() const; void InstallSgScript(Tab* t); void SgSetting(); const std::vector<SgPair>& SgPairs(); void OnSiteSgMessage(Tab* t, const std::wstring& src, const std::wstring& msg); void ShowSg(); void HideSg(); void SgTick(); void SgClick(int what); void SgInsert(int i); void PaintSg(HDC hdc); int SgRowAt(POINT p) const; static LRESULT CALLBACK SgProc(HWND h, UINT msg, WPARAM wp, LPARAM lp);
     HWND m_hSg = nullptr; std::vector<SgHit> m_sgHits; SgField m_sgField; Tab* m_sgTab = nullptr; std::wstring m_sgOrigin; int m_sgHot = -1, m_sgTestClick = 0; DWORD m_sgShown = 0, m_sgRate[2] = { 0, 0 }; RECT m_sgBox{}, m_sgWv{}; std::vector<SgPair> m_sgPairs; ULONGLONG m_sgStamp = 0; bool m_sgLoaded = false;
-    SpFeed m_sp; bool m_spBusy = false; bool SponsorOn() const; void SponsorLoad(); void SponsorKick(); void SponsorGot(void* r); void SponsorHide(const std::wstring& id); void SponsorHtml(std::wstring& tiles, std::wstring& bg);   // sponsored content (Sponsor.inl)
+    SpFeed m_sp; bool m_spBusy = false; bool SponsorOn() const; void SponsorLoad(); void SponsorKick(); void SponsorGot(void* r); void SponsorHide(const std::wstring& id); void SponsorHtml(std::wstring& tiles, std::wstring& bg);
+    SnLedger m_sn; std::vector<SnLogLine> m_snLog; bool m_snBusy = false, m_snDirty = false;   // anonymous counts (Signals.inl)
+    bool SnOn() const; void SnLoad(); void SnSave(); void SnLogAdd(const char* kind, int bytes, bool ok); void SnBlockedHit(const std::string& host); void SnEvent(const std::wstring& kind, const std::wstring& id); void SnKick(bool force = false); void SnGot(void* r); void SnClear(); void SnWipe(); void SnPush();   // sponsored content (Sponsor.inl)
     static bool         IsUrl(const std::wstring& s);
 
     // â”€â”€â”€ Members â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€

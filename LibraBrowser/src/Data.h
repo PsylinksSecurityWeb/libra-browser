@@ -65,7 +65,7 @@ inline std::wstring DataDir() {
 }
 // Files that list where you have been are stored encrypted (Windows DPAPI, this Windows user only). Old plain files are read, then upgraded on the next write.
 inline bool IsSecretFile(const std::wstring& p) {
-    for (const wchar_t* n : { L"\\history.txt", L"\\dns.cache", L"\\stats.txt", L"\\session.txt", L"\\bookmarks.txt", L"\\sitemodes.txt", L"\\keepid.txt", L"\\pinned.txt", L"\\tiles.txt", L"\\pwnever.txt", L"\\sites.txt", L"\\memory.dat", L"\\agent_perms.txt", L"\\spons.dat", L"\\sgnever.txt" }) { size_t l = wcslen(n); if (p.size() > l && _wcsicmp(p.c_str() + p.size() - l, n) == 0) return true; }
+    for (const wchar_t* n : { L"\\history.txt", L"\\dns.cache", L"\\stats.txt", L"\\session.txt", L"\\bookmarks.txt", L"\\sitemodes.txt", L"\\keepid.txt", L"\\pinned.txt", L"\\tiles.txt", L"\\pwnever.txt", L"\\sites.txt", L"\\memory.dat", L"\\agent_perms.txt", L"\\spons.dat", L"\\spstat.dat", L"\\sgnever.txt" }) { size_t l = wcslen(n); if (p.size() > l && _wcsicmp(p.c_str() + p.size() - l, n) == 0) return true; }
     return false;
 }
 inline std::string SecretChunk(const std::string& plain) {   // "LBE1" + length + DPAPI blob

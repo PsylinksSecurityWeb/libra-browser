@@ -4,7 +4,7 @@
 
 struct SpCfg { std::wstring feed; std::string base; std::vector<SpKeyA> keys; bool test = false; };
 static SpCfg SpConfig() {
-    SpCfg c; c.feed = L"";   // publisher configures this only with a verified HTTPS endpoint and matching public keys
+    SpCfg c; c.feed = L"";   // feed is intentionally empty in the public build until a publisher-controlled endpoint is verified
     static const SpKeyA owner[2] = { { "k1", "", "" }, { "k2", "", "" } };   // public signing keys (x, y); k2 is a spare for key rotation. Empty = the feature stays off
     for (auto& k : owner) c.keys.push_back(k);
     wchar_t f[512], k[512];
@@ -20,15 +20,16 @@ static SpCfg SpConfig() {
     return c;
 }
 
-static bool SpGet(int port, bool direct, const std::wstring& url, size_t cap, std::string& body) {   // plain GET, no cookies, no redirects
+static const wchar_t kSpUa[] = L"User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36";   // the same for every Libra, so it says nothing
+static bool SpGet(int port, bool direct, const std::wstring& url, size_t cap, std::string& body, bool follow = false) {   // follow = redirects allowed (only for the update installer, whose SHA-256 is signed)   // plain GET, no cookies, no redirects
     dl::Url u; body.clear(); if (!dl::Crack(url, u)) return false;
     HINTERNET ses = direct ? WinHttpOpen(L"Libra", WINHTTP_ACCESS_TYPE_NO_PROXY, nullptr, nullptr, 0) : dl::Session(port, 1); if (!ses) return false;
     WinHttpSetTimeouts(ses, 5000, 5000, 8000, 12000); bool ok = false;
     if (HINTERNET con = WinHttpConnect(ses, u.host.c_str(), u.port, 0)) {
         if (HINTERNET rq = WinHttpOpenRequest(con, L"GET", u.path.c_str(), nullptr, WINHTTP_NO_REFERER, WINHTTP_DEFAULT_ACCEPT_TYPES, u.https ? WINHTTP_FLAG_SECURE : 0)) {
-            DWORD nc = WINHTTP_DISABLE_COOKIES | WINHTTP_DISABLE_REDIRECTS; WinHttpSetOption(rq, WINHTTP_OPTION_DISABLE_FEATURE, &nc, sizeof nc);
-            static const wchar_t* hdr = L"User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36\r\nAccept: application/json, image/*";
-            if (WinHttpSendRequest(rq, hdr, (DWORD)-1, WINHTTP_NO_REQUEST_DATA, 0, 0, 0) && WinHttpReceiveResponse(rq, nullptr)) {
+            DWORD nc = WINHTTP_DISABLE_COOKIES | (follow ? 0 : WINHTTP_DISABLE_REDIRECTS); WinHttpSetOption(rq, WINHTTP_OPTION_DISABLE_FEATURE, &nc, sizeof nc);
+            static const std::wstring hdr = std::wstring(kSpUa) + L"\r\nAccept: application/json, image/*";
+            if (WinHttpSendRequest(rq, hdr.c_str(), (DWORD)-1, WINHTTP_NO_REQUEST_DATA, 0, 0, 0) && WinHttpReceiveResponse(rq, nullptr)) {
                 DWORD st = 0, sl = sizeof st; WinHttpQueryHeaders(rq, WINHTTP_QUERY_STATUS_CODE | WINHTTP_QUERY_FLAG_NUMBER, nullptr, &st, &sl, nullptr);
                 if (st == 200) { char buf[8192]; DWORD n = 0; while (body.size() <= cap && WinHttpReadData(rq, buf, sizeof buf, &n) && n) body.append(buf, n); ok = body.size() <= cap; }
             }
@@ -79,10 +80,10 @@ static std::string SpRegion() {
     GEOID g = GetUserGeoID(GEOCLASS_NATION); if (g != GEOID_NOT_AVAILABLE && GetGeoInfoW(g, GEO_ISO2, b, 16, 0) > 0) return ToUtf8(b);
     return "";
 }
-bool BrowserWindow::SponsorOn() const { return !m_incognito && !m_setup && !m_child && m_set.Get(L"sponsored", L"1") != L"0"; }
+bool BrowserWindow::SponsorOn() const { return !m_incognito && !m_setup && !m_child; }   // owner decision: sponsored content funds Libra, so there is no global off switch (never in private windows, Child Safety, first run)
 
 void BrowserWindow::SponsorLoad() {   // cached feed from disk, checked again (signature) every time
-    m_sp = SpFeed(); if (!SponsorOn()) return;
+    m_sp = SpFeed(); if (!SponsorOn()) return; SnLoad();
     SpCfg c = SpConfig(); if (c.keys.empty()) return;
     std::string d = ReadAll(DataDir() + L"\\spons.dat"); if (d.empty() || d.size() > 4u << 20) return;
     size_t e = d.find('\n'); std::string env = d.substr(0, e);
@@ -105,7 +106,7 @@ void BrowserWindow::SponsorKick() {   // once a day, in the background
     std::thread([hw, c, port, prev, now] { PostMessage(hw, WM_APP + 37, 0, (LPARAM)SpFetch(c, port, prev, now)); }).detach();
 }
 void BrowserWindow::SponsorGot(void* p) {
-    m_spBusy = false; std::unique_ptr<SpResult> r((SpResult*)p); if (!r || !SponsorOn()) return;
+    m_spBusy = false; std::unique_ptr<SpResult> r((SpResult*)p); SnLogAdd("feed", r ? (int)r->env.size() : 0, r != nullptr); if (!r || !SponsorOn()) return;
     long long prev = _wtoi64(m_set.Get(L"sp_seq", L"0").c_str()); if (r->feed.seq < prev) return;
     m_sp = r->feed; m_set.Set(L"sp_seq", std::to_wstring(m_sp.seq)); m_set.Set(L"sp_last", std::to_wstring((long long)time(nullptr)));
     std::string o = r->env + "\n"; for (auto& it : m_sp.items) if (!it.imgB64.empty()) o += "IMG\t" + it.id + "\t" + it.imgB64 + "\n";
@@ -118,13 +119,18 @@ void BrowserWindow::SponsorHide(const std::wstring& id) {   // hide one campaign
     for (auto& kv : m) o += (o.empty() ? "" : ",") + kv.first + "=" + std::to_string(kv.second);
     m_set.Set(L"sp_hide", FromUtf8(o));
 }
+static std::wstring SpGoUrl(const std::string& u) {   // advertiser address + one constant tag, the same for every user
+    std::string x = u, frag; size_t h = x.find('#'); if (h != std::string::npos) { frag = x.substr(h); x.resize(h); }
+    if (x.find("utm_source=") == std::string::npos) x += std::string(x.find('?') == std::string::npos ? "?" : "&") + "utm_source=libra";
+    return FromUtf8(x + frag);
+}
 void BrowserWindow::SponsorHtml(std::wstring& tiles, std::wstring& bg) {
     tiles.clear(); bg.clear(); if (!SponsorOn() || m_sp.items.empty()) return;
     long long now = (long long)time(nullptr); std::string region = SpRegion(); auto hid = SpHiddenLoad(m_set);
     auto tl = SpPick(m_sp, "tile", 2, now, region, hid), bl = SpPick(m_sp, "background", 1, now, region, hid);
     for (auto* it : tl) {
         std::wstring id = FromUtf8(it->id), name = FromUtf8(it->title); unsigned hh = 5381; for (wchar_t ch : name) hh = hh * 33 + ch; int hue = hh % 360;
-        tiles += L"<div class=\"tw sp\" data-id=\"" + Esc(id) + L"\"><button class=\"spx\" data-sp=\"home.sphide\" data-id=\"" + Esc(id) + L"\" aria-label=\"Hide this\" title=\"Hide this\">&#215;</button><a class=\"site\" href=\"" + Esc(FromUtf8(it->click)) + L"\"><div class=\"ico\"";
+        tiles += L"<div class=\"tw sp\" data-id=\"" + Esc(id) + L"\" data-spid=\"" + Esc(id) + L"\"><button class=\"spx\" data-sp=\"home.sphide\" data-id=\"" + Esc(id) + L"\" aria-label=\"Hide this\" title=\"Hide this\">&#215;</button><a class=\"site\" data-spc=\"" + Esc(id) + L"\" href=\"" + Esc(SpGoUrl(it->click)) + L"\" rel=\"noopener noreferrer\"><div class=\"ico\"";
         if (!it->imgB64.empty() && SpMimeOfB64(it->imgB64)) tiles += L"><img alt=\"\" src=\"data:" + FromUtf8(SpMimeOfB64(it->imgB64)) + L";base64," + FromUtf8(it->imgB64) + L"\">";
         else tiles += L" style=\"background:hsl(" + std::to_wstring(hue) + L",70%,92%);color:hsl(" + std::to_wstring(hue) + L",55%,32%)\">" + std::wstring(1, (wchar_t)towupper(name.empty() ? L'?' : name[0]));
         tiles += L"</div><span>" + Esc(name) + L"</span><em class=\"spl\">Sponsored</em></a></div>";
@@ -132,9 +138,12 @@ void BrowserWindow::SponsorHtml(std::wstring& tiles, std::wstring& bg) {
     if (tl.empty() && bl.empty()) return;
     for (auto* it : bl) {
         const char* mime = SpMimeOfB64(it->imgB64); if (!mime) continue; std::wstring id = FromUtf8(it->id);
-        bg += L"<div class=\"spbg\" style=\"background-image:url(data:" + FromUtf8(mime) + L";base64," + FromUtf8(it->imgB64) + L")\"></div>"
-              L"<div class=\"spill\"><span>Sponsored &middot; " + Esc(FromUtf8(it->advertiser)) + L"</span><a href=\"" + Esc(FromUtf8(it->click)) + L"\">Visit</a><button data-sp=\"home.sphide\" data-id=\"" + Esc(id) + L"\">Hide</button></div>";
+        bg += L"<div class=\"spbg\" data-spid=\"" + Esc(id) + L"\" style=\"background-image:url(data:" + FromUtf8(mime) + L";base64," + FromUtf8(it->imgB64) + L")\"></div>"
+              L"<div class=\"spill\"><span>Sponsored &middot; " + Esc(FromUtf8(it->advertiser)) + L"</span><a data-spc=\"" + Esc(id) + L"\" rel=\"noopener noreferrer\" href=\"" + Esc(SpGoUrl(it->click)) + L"\">Visit</a><button data-sp=\"home.sphide\" data-id=\"" + Esc(id) + L"\">Hide</button></div>";
     }
-    bg += L"<a class=\"spoff\" href=\"#\" data-sp=\"home.spoff\">Turn off sponsored content</a>"
-          L"<script>document.addEventListener('click',e=>{const b=e.target.closest('[data-sp]');if(b){e.preventDefault();chrome.webview.postMessage(b.dataset.sp+'\\t'+(b.dataset.id||''))}})</script>";
+    bg += L""
+          L"<script>document.addEventListener('click',e=>{const b=e.target.closest('[data-sp]');if(b){e.preventDefault();chrome.webview.postMessage(b.dataset.sp+'\\t'+(b.dataset.id||''))}});"
+          L"{const M=(k,i)=>chrome.webview.postMessage(k+'\\t'+i),seen=new Set(),ck=e=>{const a=e.isTrusted&&e.target.closest&&e.target.closest('[data-spc]');if(a)M('home.spclick',a.dataset.spc)};"
+          L"document.addEventListener('click',ck);document.addEventListener('auxclick',ck);"
+          L"addEventListener('DOMContentLoaded',()=>{const io=new IntersectionObserver(es=>es.forEach(n=>{const i=n.target.dataset.spid;if(n.isIntersecting){n.target._t=setTimeout(()=>{if(document.visibilityState==='visible'&&!seen.has(i)){seen.add(i);M('home.spshow',i)}},1000)}else clearTimeout(n.target._t)}),{threshold:.5});document.querySelectorAll('[data-spid]').forEach(x=>io.observe(x))})}</script>";
 }

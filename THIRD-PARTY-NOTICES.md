@@ -26,3 +26,6 @@ Libra Browser itself is under the Libra Source-Available License (see `LICENSE`)
 - Lucide icons (https://lucide.dev), ISC licence: assistant panel icons (sparkles, square-pen, book-open, settings, x, chevron-left, arrow-up, square).
 
 - whisper.cpp (MIT, https://github.com/ggml-org/whisper.cpp) and the OpenAI Whisper base model weights (MIT): optional offline voice input; downloaded on request, not bundled.
+
+## Downloaded on request (not part of the Libra Browser exe)
+- **pdf.js 3.11.174** (Apache-2.0, Mozilla) and **pdf-lib 1.17.1** (MIT, Andrew Dillon): used by "Sign a PDF" (Ctrl+Shift+F). The files are downloaded from cdn.jsdelivr.net only after the user requests the feature and are checked against fixed size and SHA-256 values listed in `Pdf.inl`.

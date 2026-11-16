@@ -102,7 +102,7 @@ void BrowserWindow::PrivClear(Tab* t, const std::set<std::wstring>& keys, const 
     if (keys.count(L"rec")) { DeleteFileW((DataDir() + L"\\sites.txt").c_str()); DeleteFileW((DataDir() + L"\\session.txt").c_str()); DeleteFileW((DataDir() + L"\\spons.dat").c_str()); m_sp = SpFeed(); m_closed.clear(); }
     if (keys.count(L"dl")) m_dl.erase(std::remove_if(m_dl.begin(), m_dl.end(), [](const DownloadItem& d) { return d.state != 0; }), m_dl.end());   // the list only, never the files
     if (keys.count(L"agt")) AgWipe();
-    if (keys.count(L"ctr")) { m_totalBlocked = 0; m_totalDirty = true; m_set.Set(L"blocked_total", L"0"); m_stat.clear(); m_statLoaded = true; DeleteFileW((DataDir() + L"\\stats.txt").c_str()); m_statDirty = false; for (auto& tb : m_tabs) { tb->blockedReq = 0; tb->letThrough = 0; tb->blockedHosts.clear(); } }
+    if (keys.count(L"ctr")) { SnWipe(); m_totalBlocked = 0; m_totalDirty = true; m_set.Set(L"blocked_total", L"0"); m_stat.clear(); m_statLoaded = true; DeleteFileW((DataDir() + L"\\stats.txt").c_str()); m_statDirty = false; for (auto& tb : m_tabs) { tb->blockedReq = 0; tb->letThrough = 0; tb->blockedHosts.clear(); } }
     if (keys.count(L"hist")) run->steps.push_back({ (COREWEBVIEW2_BROWSING_DATA_KINDS)(COREWEBVIEW2_BROWSING_DATA_KINDS_BROWSING_HISTORY | COREWEBVIEW2_BROWSING_DATA_KINDS_DOWNLOAD_HISTORY), L"history" });
     if (keys.count(L"cook")) {
         run->steps.push_back({ COREWEBVIEW2_BROWSING_DATA_KINDS_COOKIES, L"cookies" });
@@ -180,6 +180,9 @@ void BrowserWindow::OnPrivPage(int idx, const std::vector<std::wstring>& v) {
     if (idx < 0 || idx >= (int)m_tabs.size() || (m_tabs[idx]->url != L"libra://privacy" && !(m_tabs[idx]->url == L"libra://history" && v[0] == L"priv.clear"))) return;
     Tab* t = m_tabs[idx].get();
     if (v[0] == L"priv.stats") { PrivSendStats(t); PrivSendReport(t); }
+    else if (v[0] == L"priv.sn") SnPush();
+    else if (v[0] == L"priv.snsend") { SnKick(true); SnPush(); }
+    else if (v[0] == L"priv.snclear") SnClear();
     else if (v[0] == L"priv.clear" && v.size() == 3) {
         std::set<std::wstring> keys; size_t s = 0;
         for (;;) { size_t e = v[1].find(L',', s); std::wstring k = v[1].substr(s, e == std::wstring::npos ? e : e - s);

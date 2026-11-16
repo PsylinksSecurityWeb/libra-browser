@@ -85,32 +85,32 @@ void BrowserWindow::Burn() {
     for (int i = (int)m_tabs.size() - 2; i >= 0; --i) CloseTab(i);
     DeleteFileW((DataDir() + L"\\tiles.txt").c_str()); DeleteFileW((DataDir() + L"\\pinned.txt").c_str());
     m_wipeDone = [](bool ok, std::wstring err) { g_burnWiped = true; g_burnOk = ok; g_burnErr = err; };
-    SetTimer(m_hWnd, 2040, 500, nullptr); SetTimer(m_hWnd, 2041, 33, nullptr);
+    SetTimer(m_hWnd, 2070, 500, nullptr); SetTimer(m_hWnd, 2071, 33, nullptr);
 }
 
 static BOOL CALLBACK BurnClosePriv(HWND h, LPARAM) { wchar_t c[40] = {}; GetClassNameW(h, c, 40); if (wcscmp(c, L"LibraBrowserWndP") == 0) PostMessageW(h, WM_CLOSE, 0, 0); return TRUE; }
 
 bool BrowserWindow::BurnTimer(UINT_PTR id) {
-    if (id == 2042) { KillTimer(m_hWnd, 2042); Burn(); return true; }   // test hook only (LIBRA_TEST_OPEN=burn)
-    if (id == 2040) {
-        KillTimer(m_hWnd, 2040);
+    if (id == 2072) { KillTimer(m_hWnd, 2072); Burn(); return true; }   // test hook only (LIBRA_TEST_OPEN=burn)
+    if (id == 2070) {
+        KillTimer(m_hWnd, 2070);
         int i = IndexOf(m_burnTab);
-        if (i >= 0 && !m_tabs[i]->webView && ++g_burnTries < 40) { SetTimer(m_hWnd, 2040, 250, nullptr); return true; }   // the engine of the new tab is still starting
+        if (i >= 0 && !m_tabs[i]->webView && ++g_burnTries < 40) { SetTimer(m_hWnd, 2070, 250, nullptr); return true; }   // the engine of the new tab is still starting
         if (i >= 0) WipeAll(i); else { g_burnWiped = true; g_burnOk = false; g_burnErr = L"engine not ready"; }
         return true;
     }
-    if (id != 2041) return false;
+    if (id != 2071) return false;
     DWORD ms = GetTickCount() - g_burnT0;
     if (!g_burnDoneMs && !g_burnWiped && ms > 25000) { g_burnWiped = true; g_burnOk = false; g_burnErr = L"it took too long"; }
     if (!g_burnDoneMs && g_burnWiped && !g_burnOk) {   // something could not be cleared: stay open and say so (nothing restarts)
-        KillTimer(m_hWnd, 2041); if (g_burnWnd) { DestroyWindow(g_burnWnd); g_burnWnd = nullptr; } m_burning = false;
+        KillTimer(m_hWnd, 2071); if (g_burnWnd) { DestroyWindow(g_burnWnd); g_burnWnd = nullptr; } m_burning = false;
         MessageBoxW(m_hWnd, (L"Not everything could be cleared: " + g_burnErr + L"\n\nLibra stays open. Please try Burn again.").c_str(), L"Burn", MB_ICONWARNING);
         return true;
     }
     if (!g_burnDoneMs && g_burnWiped && ms >= kBurnMin) g_burnDoneMs = ms;
     RECT cr; GetClientRect(m_hWnd, &cr);
     if (g_burnDoneMs && ms - g_burnDoneMs >= kBurnEnd) {   // black screen: close private windows, start the fresh Libra after this one has quit, quit
-        KillTimer(m_hWnd, 2041);
+        KillTimer(m_hWnd, 2071);
         EnumWindows(BurnClosePriv, 0);
         wchar_t exe[MAX_PATH]; GetModuleFileNameW(nullptr, exe, MAX_PATH);
         SetEnvironmentVariableW(L"LIBRA_TEST_OPEN", nullptr);   // (test hook must not fire again in the new process)

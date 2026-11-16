@@ -2,7 +2,7 @@
 #include "pch.h"
 
 // Simple domain-based ad blocker — lookup via hash set (O(1) per request).
-// Loaded from a plain text "hosts"-style block list (one domain per line, 
+// Loaded from a plain text "hosts"-style block list (one domain per line,
 // lines starting with # are comments).
 class AdBlocker {
 public:

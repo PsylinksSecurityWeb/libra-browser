@@ -57,6 +57,10 @@ Explore the browser before installing: the gallery shows the start page, privacy
 
 ![Libra Browser search engines](docs/screenshots/search-engines.png)
 
+| First-click protection | Search selection |
+|---|---|
+| ![Libra Browser protected from the first click](docs/screenshots/launch-protected.png) | ![Libra Browser search selection](docs/screenshots/launch-search.png) |
+
 ## Features
 **Protection**
 - Cloud ad and tracker blocking (DoH + blocklist), per-site Off / Balanced / Max, live counters and a 7-day protection report

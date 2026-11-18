@@ -25,7 +25,7 @@ void BrowserWindow::OnImport(int idx, const std::wstring& c, const std::wstring&
     auto push = [&](const std::wstring& js) { t->webView->ExecuteScript((L"lbImp(" + js + L")").c_str(), nullptr); };
     if (c == L"bm.impno") { m_imp.clear(); m_impSet.clear(); push(L"{clear:1}"); return; }
     if (c == L"bm.impgo") {
-        size_t add = 0; for (auto& kv : m_imp) { if (m_bm.size() >= IM_MAX_ITEMS) break; m_bm.push_back({ FromUtf8(kv.first), FromUtf8(kv.second) }); ++add; }
+        ReloadBookmarks(); size_t add = 0; for (auto& kv : m_imp) { if (m_bm.size() >= IM_MAX_ITEMS) break; m_bm.push_back({ FromUtf8(kv.first), FromUtf8(kv.second) }); ++add; }
         m_imp.clear(); if (add) SaveBookmarks();
         for (auto& kv : m_impSet) m_set.Set(kv.first, kv.second);   // from a backup: validated settings, they apply after a restart
         m_impSet.clear(); RenderTab(idx); return;
@@ -75,7 +75,7 @@ static std::wstring ImFound() {   // first-run offer: which browsers have a book
 }
 void BrowserWindow::OnboardImport(int idx, const std::wstring& a) {   // first run: one click on "Import from X" reads that file and adds the bookmarks
     OnImport(idx, L"bm.imp", a); if (m_imp.empty()) return;
-    size_t add = 0; for (auto& kv : m_imp) { if (m_bm.size() >= IM_MAX_ITEMS) break; m_bm.push_back({ FromUtf8(kv.first), FromUtf8(kv.second) }); ++add; }
+    ReloadBookmarks(); size_t add = 0; for (auto& kv : m_imp) { if (m_bm.size() >= IM_MAX_ITEMS) break; m_bm.push_back({ FromUtf8(kv.first), FromUtf8(kv.second) }); ++add; }
     m_imp.clear(); if (add) SaveBookmarks();
     Tab* t = m_tabs[idx].get(); if (t->webView) t->webView->ExecuteScript((L"lbImp({done:" + std::to_wstring(add) + L"})").c_str(), nullptr);
 }

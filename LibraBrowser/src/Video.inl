@@ -195,7 +195,7 @@ void BrowserWindow::AttachContextSave(Tab* t) {   // right-click: one clear "Sav
                 if (SUCCEEDED(e9->CreateContextMenuItem(L"Open link in new tab", nullptr, COREWEBVIEW2_CONTEXT_MENU_ITEM_KIND_COMMAND, &ot)) && ot) {
                     EventRegistrationToken tk3; std::wstring lk = link.get();
                     ot->add_CustomItemSelected(Microsoft::WRL::Callback<ICoreWebView2CustomItemSelectedEventHandler>(
-                        [this, t, lk](ICoreWebView2ContextMenuItem*, IUnknown*) -> HRESULT { if (IndexOf(t) >= 0) OpenTab(lk); return S_OK; }).Get(), &tk3);
+                        [this, t, lk](ICoreWebView2ContextMenuItem*, IUnknown*) -> HRESULT { if (IndexOf(t) >= 0) OpenTab(lk, false, true); return S_OK; }).Get(), &tk3);
                     items->InsertValueAtIndex(0, ot.get());
                 }
             }

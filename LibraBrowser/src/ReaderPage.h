@@ -7,9 +7,10 @@
 
 static const wchar_t* kReaderJs = LR"JS((function(){try{
 var BAD='script,style,noscript,nav,header,footer,aside,form,iframe,svg,canvas,button,select,input,textarea,dialog,[role=navigation],[role=banner],[role=complementary],[aria-hidden=true],.sidebar,.comments,#comments,.advert,.ads';
-function sc(e){var s=0,ps=e.querySelectorAll('p');for(var i=0;i<ps.length;i++){var n=(ps[i].innerText||'').length;if(n>60)s+=n}return s}
+var PL=new Map();function pl(p){var v=PL.get(p);if(v===undefined){v=(p.innerText||'').length;PL.set(p,v)}return v}   // each paragraph is measured once, not once per wrapping container
+function sc(e){var s=0,ps=e.querySelectorAll('p');for(var i=0;i<ps.length;i++){var n=pl(ps[i]);if(n>60)s+=n}return s}
 var best=document.querySelector('article')||document.querySelector('main,[role=main]'),bs=best?sc(best):0,cs=document.querySelectorAll('article,main,[role=main],section,div');
-for(var k=0;k<cs.length&&k<4000;k++){var s=sc(cs[k]);if(s>bs*1.25||(!best&&s>bs)){best=cs[k];bs=s}}
+for(var k=0;k<cs.length&&k<12000;k++){var s=sc(cs[k]);if(s>bs*1.25||(!best&&s>bs)){best=cs[k];bs=s}}
 var out=[],cnt=0;
 function tx(e){return(e.innerText||'').replace(/\s+/g,' ').trim()}
 var INL=/^(B|I|EM|STRONG|A|SPAN|FONT|U|SUP|SUB|SMALL|CODE)$/;

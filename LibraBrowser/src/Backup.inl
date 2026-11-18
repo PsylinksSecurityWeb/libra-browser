@@ -55,7 +55,7 @@ void BrowserWindow::OnBackup(int idx, const std::vector<std::wstring>& v) {
                 PWSTR dl = nullptr; if (SUCCEEDED(SHGetKnownFolderPath(FOLDERID_Documents, 0, nullptr, &dl))) { wil::com_ptr<IShellItem> fi; if (SUCCEEDED(SHCreateItemFromParsingName(dl, nullptr, IID_PPV_ARGS(&fi)))) d->SetDefaultFolder(fi.get()); CoTaskMemFree(dl); }
                 if (SUCCEEDED(d->Show(m_hWnd))) { wil::com_ptr<IShellItem> it; PWSTR ps = nullptr; if (SUCCEEDED(d->GetResult(&it)) && SUCCEEDED(it->GetDisplayName(SIGDN_FILESYSPATH, &ps))) { path = ps; CoTaskMemFree(ps); } } }
             if (path.empty()) { push(L"{info:\"Not saved.\"}"); return; } }
-        WriteAllRaw(path, file, false);
+        if (!WriteAllRaw(path, file, false)) { push(L"{err:\"The backup file could not be written there (is the folder read-only or the disk full?).\"}"); return; }
         push(L"{info:\"Saved " + std::to_wstring(nb) + L" bookmarks and " + std::to_wstring(ns) + L" settings, encrypted with your passphrase. Keep the passphrase: it can not be recovered.\"}"); return;
     }
     if (c != L"bm.bkimp") return;
@@ -68,7 +68,7 @@ void BrowserWindow::OnBackup(int idx, const std::vector<std::wstring>& v) {
         if (path.empty()) return; }
     std::string f = ImReadFile(path);
     if (f.size() < 4 + 4 + 16 + 12 + 16 + 8 || f.compare(0, 4, "LBK1") != 0) { push(L"{err:\"That is not a Libra backup file.\"}"); return; }
-    ULONG iter = 0; memcpy(&iter, f.data() + 4, 4); if (iter < 100000 || iter > 5000000) { push(L"{err:\"That backup file is damaged.\"}"); return; }
+    ULONG iter = 0; memcpy(&iter, f.data() + 4, 4); if (iter < 100000 || iter > 2000000) { push(L"{err:\"That backup file is damaged.\"}"); return; }
     const BYTE* salt = (const BYTE*)f.data() + 8; const BYTE* nonce = salt + 16; BYTE tag[16]; memcpy(tag, nonce + 12, 16);
     std::string hdr = f.substr(0, 4 + 4 + 16 + 12), body = f.substr(hdr.size() + 16); BYTE key[32];
     bool ok = BkKey(pass, salt, iter, key) && BkAes(false, key, nonce, hdr, body, tag); SecureZeroMemory(key, 32);

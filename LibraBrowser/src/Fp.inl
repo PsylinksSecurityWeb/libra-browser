@@ -22,7 +22,8 @@ static std::wstring StripTrackers(const std::wstring& url) {   // "" = nothing t
     while (i <= qs.size()) {
         size_t e = qs.find(L'&', i); if (e == std::wstring::npos) e = qs.size();
         std::wstring kv = qs.substr(i, e - i), k = kv.substr(0, kv.find(L'=')); for (auto& c : k) c = (wchar_t)towlower(c);
-        bool drop = k.rfind(L"utm_", 0) == 0 && kv != L"utm_source=libra";   // the one constant tag on sponsored links stays: it is the same for every user for (auto b : bad) if (k == b) drop = true;
+        bool drop = k.rfind(L"utm_", 0) == 0 && kv != L"utm_source=libra";   // the one constant tag on sponsored links stays: it is the same for every user
+        for (auto b : bad) if (k == b) drop = true;   // (this line used to sit inside the comment above, so only utm_ was ever removed)
         if (drop) cut = true; else if (!kv.empty()) out += (out.empty() ? L"" : L"&") + kv;
         i = e + 1;
     }

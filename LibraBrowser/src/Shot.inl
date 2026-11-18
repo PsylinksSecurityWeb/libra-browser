@@ -17,6 +17,7 @@ static int ShPngW(const std::string& b) { return b.size() > 24 ? (int)(((unsigne
 static RECT ShBar() { int bw = (int)(388 * g_s.u), bh = (int)(46 * g_s.u), y = (int)(18 * g_s.u); int x = (g_s.W - bw) / 2; return { x, y, x + bw, y + bh }; }
 static RECT ShSeg(int i) { RECT b = ShBar(); int pad = (int)(6 * g_s.u), sw = (int)(108 * g_s.u); return { b.left + pad + i * sw, b.top + pad, b.left + pad + (i + 1) * sw, b.bottom - pad }; }
 static RECT ShCap() { RECT b = ShBar(); int d = (int)(34 * g_s.u), pad = (int)(6 * g_s.u); return { b.right - pad - d, b.top + (b.bottom - b.top - d) / 2, b.right - pad, b.top + (b.bottom - b.top - d) / 2 + d }; }
+static RECT ShX() { RECT b = ShBar(); int d = (int)(34 * g_s.u), g = (int)(10 * g_s.u); return { b.right + g, b.top + (b.bottom - b.top - d) / 2, b.right + g + d, b.top + (b.bottom - b.top - d) / 2 + d }; }   // visible cancel button
 static RECT ShBtn(bool save) {   // Save / Cancel next to the selection
     int bw = (int)(88 * g_s.u), bh = (int)(34 * g_s.u), gap = (int)(8 * g_s.u), m = (int)(8 * g_s.u);
     int right = std::min((int)g_s.sel.right, g_s.W - m), y = g_s.sel.bottom + (int)(12 * g_s.u);
@@ -36,6 +37,7 @@ static int ShHit(int x, int y) {   // 0-2 segment, 3 capture, 4 save, 5 cancel, 
         if (ShIn(ShBtn(true), x, y)) return 4; if (ShIn(ShBtn(false), x, y)) return 5;
         for (int k = 0; k < 8; ++k) if (ShIn(ShHandle(k), x, y)) return 11 + k;
     }
+    if (ShIn(ShX(), x, y)) return 6;
     for (int i = 0; i < 3; ++i) if (ShIn(ShSeg(i), x, y)) return i;
     if (g_s.mode < 2 && ShIn(ShCap(), x, y)) return 3;
     if (g_s.hasSel && g_s.mode == 2 && ShIn(g_s.sel, x, y)) return 10;
@@ -98,7 +100,9 @@ static void ShDraw() {
             float cx = (c.left + c.right) / 2.f, cy = (c.top + c.bottom) / 2.f, r1 = 9.f * u, r2 = 5.f * u; Pen rp(Gdiplus::Color(255, 255, 255, 255), 1.6f * u); g.DrawEllipse(&rp, cx - r1, cy - r1, 2 * r1, 2 * r1);
             SolidBrush wbr(Gdiplus::Color(255, 255, 255, 255)); g.FillEllipse(&wbr, cx - r2, cy - r2, 2 * r2, 2 * r2);
         }
-        const wchar_t* hint = g_s.mode == 0 ? L"What you see now. Press Enter or the button." : g_s.mode == 1 ? L"The whole page, top to bottom." : g_s.hasSel ? L"Drag the edges to adjust. Enter saves, Esc cancels." : L"Drag on the page to choose the area.";
+        { RECT xr = ShX(); bool hv = g_s.hover == 6; SolidBrush xb(Gdiplus::Color(255, hv ? 235 : 255, hv ? 235 : 255, hv ? 235 : 255)); g.FillEllipse(&xb, (REAL)xr.left, (REAL)xr.top, (REAL)(xr.right - xr.left), (REAL)(xr.bottom - xr.top));
+          float cx = (xr.left + xr.right) / 2.f, cy = (xr.top + xr.bottom) / 2.f, a = 5.5f * u; Pen xp(Gdiplus::Color(255, 17, 17, 17), 1.8f * u); xp.SetStartCap(LineCapRound); xp.SetEndCap(LineCapRound); g.DrawLine(&xp, cx - a, cy - a, cx + a, cy + a); g.DrawLine(&xp, cx + a, cy - a, cx - a, cy + a); }
+        const wchar_t* hint = g_s.mode == 0 ? L"What you see now. Press Enter or the button. Esc or \u2715 cancels." : g_s.mode == 1 ? L"The whole page, top to bottom. Esc or \u2715 cancels." : g_s.hasSel ? L"Drag the edges to adjust. Enter saves, Esc cancels." : L"Drag on the page to choose the area. Esc or \u2715 cancels.";
         RECT hr = { 0, b.bottom + (int)(8 * u), g_s.W, b.bottom + (int)(34 * u) }; ShText(g, hint, hr, 13 * u, false, Gdiplus::Color(255, 255, 255, 255));
     });
 }
@@ -142,7 +146,9 @@ static void ShToast(bool err, const std::wstring& msg) {
     g_s.toast = CreateWindowExW(WS_EX_LAYERED | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE | WS_EX_TOPMOST, L"LibraShotToast", L"", WS_POPUP, g_s.org.x + g_s.W - w - (int)(18 * g_s.u), g_s.org.y + g_s.H - hh - (int)(18 * g_s.u), w, hh, g_s.main, nullptr, g_s.inst, nullptr);
     if (!g_s.toast) return; SetTimer(g_s.toast, 1, 16, nullptr); ShowWindow(g_s.toast, SW_SHOWNOACTIVATE);
 }
+static DWORD g_t0 = 0;
 static void ShDone(bool ok, const std::wstring& msg) {
+    { wchar_t lp[MAX_PATH]; if (TestEnv(L"LIBRA_TEST_SHOTLOG", lp, MAX_PATH) > 0 && lp[0]) { FILE* lf = nullptr; if (!_wfopen_s(&lf, lp, L"a") && lf) { fwprintf(lf, L"mode=%d ms=%lu ok=%d files=%d\n", g_s.mode, (unsigned long)(GetTickCount() - g_t0), ok ? 1 : 0, (int)g_s.files.size()); fclose(lf); } } }   // test hook: how long a capture took
     { wchar_t tf[MAX_PATH]; if (TestEnv(L"LIBRA_TEST_SHOTDIR", tf, MAX_PATH) > 0) WriteAllRaw(std::wstring(tf) + L"\\shot.log", ToUtf8(std::wstring(ok ? L"ok: " : L"FAILED: ") + msg + L"\n"), true); }   // test hook only
     if (ok) ShToast(false, msg); else ShToast(true, msg);
 }
@@ -203,18 +209,31 @@ static void ShFullStart(double wcss, double hcss, double dpr) {
     J.partHp = std::max(1024, ((int)std::min(16000.0, 60e6 / J.Wp) / 1024) * 1024); J.n = std::min(12, (J.Hp + J.partHp - 1) / J.partHp); ShFullStep();
 }
 static void ShRun() {
-    if (g_s.busy || !g_s.wv) return; g_s.busy = true; g_s.base = ShStamp(); g_s.files.clear(); g_s.busyMsg = L"Capturing..."; g_s.dirty = true; ShDraw();
+    if (g_s.busy || !g_s.wv) return; g_t0 = GetTickCount(); g_s.busy = true; g_s.base = ShStamp(); g_s.files.clear(); g_s.busyMsg = L"Capturing..."; g_s.dirty = true; ShDraw();
     if (g_s.mode == 0) {
         ShCdp(L"Page.captureScreenshot", L"{\"format\":\"png\",\"fromSurface\":true}", [](HRESULT hr, std::wstring r) {
             std::string b = FAILED(hr) ? "" : ShB64(r); std::wstring p = b.empty() ? L"" : ShWrite(b, L"");
             if (p.empty()) { ShDone(false, L"The page could not be captured or saved."); return; } g_s.files.push_back(p); ShDone(true, L"Screenshot saved"); });
     } else if (g_s.mode == 1) {
-        const wchar_t* js = L"(async()=>{const d=document.documentElement,b=document.body;const x=scrollX,y=scrollY;const H=()=>Math.max(d.scrollHeight,b?b.scrollHeight:0);let h=H();"
-            L"for(let p=0,i=0;p<h&&i<120;i++){scrollTo({top:p,behavior:'instant'});await new Promise(r=>setTimeout(r,260));p+=innerHeight*0.6;h=H()}"
-            L"scrollTo({top:H(),behavior:'instant'});await new Promise(r=>setTimeout(r,900));scrollTo({top:0,behavior:'instant'});await new Promise(r=>setTimeout(r,700));scrollTo({left:x,top:y,behavior:'instant'});await new Promise(r=>setTimeout(r,250));return [Math.max(d.scrollWidth,b?b.scrollWidth:0),H(),devicePixelRatio].join(',')})()";
+        // fast path: measure (and, only on long pages, wake lazy images for at most 0.6 s), then ask the engine for the whole page in one go and save its PNG as it is
+        const wchar_t* js = L"(async()=>{const d=document.documentElement,b=document.body;const H=()=>Math.max(d.scrollHeight,b?b.scrollHeight:0);let h=H();if(h>innerHeight*2&&document.images.length>2){const x=scrollX,y=scrollY,t0=performance.now();document.querySelectorAll('img[loading=lazy]').forEach(i=>{i.loading='eager'});for(let p=0;p<h&&performance.now()-t0<600;p+=innerHeight){scrollTo({top:p,behavior:'instant'});await new Promise(r=>requestAnimationFrame(r));h=H()}await Promise.race([Promise.all([...document.images].filter(i=>!i.complete).map(i=>i.decode().catch(()=>0))),new Promise(r=>setTimeout(r,350))]);scrollTo({left:x,top:y,behavior:'instant'})}return [Math.max(d.scrollWidth,b?b.scrollWidth:0),H(),devicePixelRatio].join(',')})()";
         ShCdp(L"Runtime.evaluate", std::wstring(L"{\"expression\":\"") + js + L"\",\"awaitPromise\":true,\"returnByValue\":true}", [](HRESULT hr, std::wstring r) {
             std::wstring v = ShVal(r); double w = ShNum(v, 0), h = ShNum(v, 1), dpr = ShNum(v, 2); if (FAILED(hr) || w < 1 || h < 1 || dpr < 0.5) { ShDone(false, L"The page could not be measured."); return; }
-            ShFullStart(std::min(w, std::floor(16000.0 / dpr)), h, dpr); });
+            h = std::min(h, 60000.0); const double wc = std::min(w, std::floor(16000.0 / dpr)), partCss = std::floor(15000.0 / dpr); const int n = std::min(12, (int)std::ceil(h / partCss)); const int Wp = (int)std::round(wc * dpr);
+            auto cap = std::make_shared<std::function<void(int, double, bool)>>();
+            *cap = [=](int i, double scale, bool fixed) {
+                double y0 = i * partCss, hh = std::min(partCss, h - y0); wchar_t ps[400];
+                swprintf(ps, 400, L"{\"format\":\"png\",\"fromSurface\":true,\"captureBeyondViewport\":true,\"optimizeForSpeed\":true,\"clip\":{\"x\":0,\"y\":%.3f,\"width\":%.3f,\"height\":%.3f,\"scale\":%.5f}}", y0, wc, hh, scale);
+                ShCdp(L"Page.captureScreenshot", ps, [=](HRESULT hr2, std::wstring r2) {
+                    std::string b = FAILED(hr2) ? "" : ShB64(r2); double got = ShPngW(b);
+                    if (b.empty() || got <= 0) { if (i == 0) { ShFullStart(wc, h, dpr); return; } ShDone(false, L"The page could not be captured."); return; }   // first part failed: the old strip method takes over
+                    if (!fixed && std::fabs(got - Wp) > 2) { (*cap)(i, scale * Wp / got, true); return; }   // the engine used another scale: redo once
+                    std::wstring p = ShWrite(b, n > 1 ? L"-part" + std::to_wstring(i + 1) : L"");
+                    if (p.empty()) { ShDone(false, L"The page could not be saved."); return; } g_s.files.push_back(p);
+                    if (i + 1 < n) { (*cap)(i + 1, scale, true); return; }
+                    ShDone(true, g_s.files.size() == 1 ? L"Screenshot saved" : L"Saved " + std::to_wstring(g_s.files.size()) + L" parts (very long page)"); });
+            };
+            (*cap)(0, 1.0, false); });
     } else {
         g_s.wv->ExecuteScript(L"[innerWidth,innerHeight,scrollX,scrollY].join(',')", Microsoft::WRL::Callback<ICoreWebView2ExecuteScriptCompletedHandler>([](HRESULT hr, LPCWSTR res) -> HRESULT {
             std::wstring v = res ? res : L""; if (!v.empty() && v[0] == L'"') v = v.substr(1); double iw = ShNum(v, 0), ih = ShNum(v, 1), sx = ShNum(v, 2), sy = ShNum(v, 3);
@@ -259,6 +278,7 @@ static LRESULT CALLBACK ShProc(HWND h, UINT m, WPARAM w, LPARAM l) {
         if (hit == 3) { ShRun(); return 0; }
         if (hit == 4) { ShRun(); return 0; }
         if (hit == 5) { g_s.hasSel = false; g_s.dirty = true; return 0; }
+        if (hit == 6) { ShClose(); return 0; }
         if (g_s.mode == 2) {
             g_s.dragKind = hit == 10 ? 2 : hit >= 11 ? hit : 1; g_s.p0 = { x, y }; g_s.sel0 = g_s.sel; g_s.dragging = true; SetCapture(h);
             if (g_s.dragKind == 1) { g_s.hasSel = false; } g_s.dirty = true;

@@ -41,7 +41,7 @@ void BrowserWindow::OnPdf(int idx, const std::vector<std::wstring>& v) {
                 if (!SpGet(port, test, base + FromUtf8(kPdfFiles[i].path), kPdfFiles[i].size + 4096, bodies[i], true)) r->err = "The download failed. Please try again.";
                 else if (bodies[i].size() != kPdfFiles[i].size || UpSha256(bodies[i]) != kPdfFiles[i].sha) r->err = "A downloaded file did not match its fixed checksum, so it was thrown away.";
             }
-            if (r->err.empty()) for (int i = 0; i < 3; ++i) WriteAllRaw(dir + L"\\" + kPdfFiles[i].name, bodies[i], false);
+            if (r->err.empty()) for (int i = 0; i < 3; ++i) if (!WriteAllRaw(dir + L"\\" + kPdfFiles[i].name, bodies[i], false)) r->err = "The tools could not be saved on this PC (disk full or no access).";
             PostMessage(hw, WM_APP + 43, 0, (LPARAM)r.release()); }).detach();
         return;
     }
@@ -57,7 +57,8 @@ void BrowserWindow::OnPdf(int idx, const std::vector<std::wstring>& v) {
         std::string d = ImReadFile(path);
         if (d.empty() || d.size() > kPdfMax) { run(L"lbOpenErr('That file could not be read, or it is bigger than 12 MB.')"); return; }
         if (d.compare(0, 5, "%PDF-") != 0) { run(L"lbOpenErr('That file is not a PDF.')"); return; }
-        WriteAllRaw(PdfDir() + L"\\work.pdf", d, false); run(L"lbOpen(\"" + PdfJs(PdfBase(path)) + L".pdf\")"); return;
+        if (!WriteAllRaw(PdfDir() + L"\\work.pdf", d, false)) { run(L"lbOpenErr('The PDF could not be prepared (no write access to Libra Browser data?).')"); return; }
+        run(L"lbOpen(\"" + PdfJs(PdfBase(path)) + L".pdf\")"); return;
     }
     if (c == L"pdf.save" && v.size() >= 3) {
         const std::wstring& b64w = v[2]; if (b64w.size() > kPdfMax * 2) { run(L"lbSaved(0,'The signed copy is too big.')"); return; }
@@ -73,7 +74,8 @@ void BrowserWindow::OnPdf(int idx, const std::vector<std::wstring>& v) {
                 PWSTR dl = nullptr; if (SUCCEEDED(SHGetKnownFolderPath(FOLDERID_Downloads, 0, nullptr, &dl))) { wil::com_ptr<IShellItem> fi; if (SUCCEEDED(SHCreateItemFromParsingName(dl, nullptr, IID_PPV_ARGS(&fi)))) d->SetDefaultFolder(fi.get()); CoTaskMemFree(dl); }
                 if (SUCCEEDED(d->Show(m_hWnd))) { wil::com_ptr<IShellItem> it; PWSTR ps = nullptr; if (SUCCEEDED(d->GetResult(&it)) && SUCCEEDED(it->GetDisplayName(SIGDN_FILESYSPATH, &ps))) { path = ps; CoTaskMemFree(ps); } } }
             if (path.empty()) { run(L"lbSaved(0,'Not saved.')"); return; } }
-        WriteAllRaw(path, bin, false); run(L"lbSaved(1,\"" + PdfJs(path.substr(path.find_last_of(L"\\/") + 1)) + L"\")"); return;
+        if (!WriteAllRaw(path, bin, false)) { run(L"lbSaved(0,'The signed copy could not be written there (is the folder read-only or the disk full?).')"); return; }
+        run(L"lbSaved(1,\"" + PdfJs(path.substr(path.find_last_of(L"\\/") + 1)) + L"\")"); return;
     }
 }
 void BrowserWindow::PdfToolsGot(void* p) {

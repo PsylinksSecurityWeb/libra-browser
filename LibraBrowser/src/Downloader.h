@@ -115,7 +115,10 @@ inline void Start(std::shared_ptr<DlJob> j, int conns, bool resume = false) {
         HINTERNET ses = j->file == INVALID_HANDLE_VALUE ? nullptr : Session(j->port, conns);
         if (!ses) { if (j->file != INVALID_HANDLE_VALUE) CloseHandle(j->file); j->resumable = !fresh; j->state = 2; return; }
         if (fresh) {
-            LARGE_INTEGER sz; sz.QuadPart = j->total; SetFilePointerEx(j->file, sz, nullptr, FILE_BEGIN); SetEndOfFile(j->file);   // reserve space
+            // the size comes from the server: refuse a claim bigger than the free space (a lying server could otherwise fill the disk), or a file the disk format cannot hold (FAT32 > 4 GB)
+            bool roomOk = j->total > 0; { ULARGE_INTEGER av{}; size_t sl2 = j->part.find_last_of(L"\\/"); std::wstring dir = sl2 == std::wstring::npos ? L"." : j->part.substr(0, sl2); if (GetDiskFreeSpaceExW(dir.c_str(), &av, nullptr, nullptr) && (unsigned long long)j->total + (64ull << 20) > av.QuadPart) roomOk = false; }
+            LARGE_INTEGER sz; sz.QuadPart = j->total; if (roomOk) roomOk = SetFilePointerEx(j->file, sz, nullptr, FILE_BEGIN) && SetEndOfFile(j->file);   // reserve space
+            if (!roomOk) { CloseHandle(j->file); DeleteFileW(j->part.c_str()); WinHttpCloseHandle(ses); j->resumable = false; j->state = 2; return; }
             long long seg = (j->total + conns - 1) / conns;
             j->segCur.assign(conns, 0); j->segHi.assign(conns, -1); j->got = 0;
             for (int i = 0; i < conns; ++i) { long long lo = i * seg; j->segCur[i] = lo; j->segHi[i] = std::min(j->total - 1, lo + seg - 1); }

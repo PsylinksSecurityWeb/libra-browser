@@ -28,7 +28,7 @@ Many free browsers pay for themselves with your data. Libra Browser doesn't. It 
 
 ---
 
-## New in this version (3.9.2, beta)
+## New in this version (3.9.4, beta)
 
 - **AI Assistant (beta, optional).** Bring your own API key. It can fill forms and read pages for you, asks before anything risky, never types passwords or card numbers, and never solves CAPTCHAs. **When the assistant is closed, the AI sees nothing**: nothing is read for it and nothing is sent.
 - **Auto suggest (optional, no AI, this PC only).** Click an empty name, e-mail, phone or company box and Libra Browser offers the matching value from your own saved notes in its own popup. It opens only after a real click or Tab key and never for passwords, user names, cards or ID numbers.
@@ -209,6 +209,13 @@ The very first time you open Libra Browser, you see only a short film, then a fe
 **Libra Browser. Secure, private and lightweight.**
 Built by Psylinks Security Private Limited, India.
 Source: https://github.com/PsylinksSecurityWeb/libra-browser
+
+## 3.9.4 meter, colour mode, offline game, faster screenshots
+- **Libra Meter:** a tiny always-on PC load meter (CPU as Task Manager shows it, plus disk and memory pressure). Runs without the browser (`LibraBrowser.exe --meter`), tucks into a screen edge as a colour strip and slides out when the mouse touches it. Off by default; reads Windows counters only, sends nothing.
+- **Colour mode and Appearance page:** pick any colour and the toolbar, tabs, address bar, icons and pages follow it.
+- **Libra Pop:** a small bubble-shooter game on the error page when the PC is really offline.
+- **Privacy:** optional Block Microsoft Recall, history retention (keep forever ... do not keep), notifications always refused (no web push), periodic background sync off.
+- **Faster full-page screenshot** (one capture call), a visible cancel button, and Open link in new tab opens in the background.
 
 ## 3.9.2 reading, PDFs and a calmer first run
 - **Reader mode (F9):** a clean, text-only view of an article. Pictures and scripts of the site never load in it, and it opens only from F9 on a web page.

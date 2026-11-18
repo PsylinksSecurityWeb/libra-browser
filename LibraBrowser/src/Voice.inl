@@ -62,7 +62,8 @@ static void VoiceDownloadThread(HWND hw, int port) {
     g_vBusy = false; VoicePost(hw, L"ready", L"");
 }
 
-static std::wstring VoiceTranscribe(const std::wstring& wav, const std::wstring& lang) {
+static std::wstring VoiceTranscribe(const std::wstring& wav, const std::wstring& lang0) {
+    std::wstring lang = lang0; if (lang.empty() || lang.size() > 8 || !std::all_of(lang.begin(), lang.end(), [](wchar_t c) { return c < 128 && iswalpha(c); })) lang = L"auto";   // goes onto a command line: letters only
     const std::wstring dir = VoiceDir(), cli = dir + L"\\Release\\whisper-cli.exe";
     SYSTEM_INFO si; GetSystemInfo(&si); const int th = (int)std::min<DWORD>(4, std::max<DWORD>(2, si.dwNumberOfProcessors / 2));
     std::wstring cmd = L"\"" + cli + L"\" -m \"" + dir + L"\\model.bin\" -f \"" + wav + L"\" -l " + lang + L" -nt -np -nth 0.5 -t " + std::to_wstring(th) + L" --prompt \"Flipkart, LinkedIn, Typeform, Amazon, Google, Libra Browser.\"";

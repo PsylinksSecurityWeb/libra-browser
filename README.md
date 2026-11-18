@@ -2,64 +2,72 @@
 
 <h1 align="center">Libra Browser</h1>
 <p align="center"><b>Libra Browser is a security-focused Windows browser: secure, private and lightweight. It blocks ads and trackers before they ever load.</b><br>
-No account. No sync. No telemetry in Libra Browser's own code. Built by <b>Psylinks Security Private Limited</b>, an Indian company. Version 3.9.2 (beta), a private Windows browser with an optional AI browser agent.</p>
+No account. No sync. No telemetry in Libra Browser's own code. Built by <b>Psylinks Security Private Limited</b>, an Indian company. Version 3.9.4 (beta).</p>
 
 
-<p align="center"><a href="https://github.com/PsylinksSecurityWeb/libra-browser/releases"><strong>Download Libra Browser for Windows 10/11 (64-bit)</strong></a><br><sub>Installer and SHA-256 verification are on the release page. The beta is not code-signed yet.</sub></p>
-
-<p align="center"><a href="https://github.com/PsylinksSecurityWeb/libra-browser">Source code</a> · <a href="https://github.com/PsylinksSecurityWeb/libra-browser/issues">Issues</a> · <a href="https://github.com/PsylinksSecurityWeb/libra-browser/security/advisories/new">Report a vulnerability</a></p>
+<p align="center"><a href="https://github.com/PsylinksSecurityWeb/libra-browser">GitHub</a> · <a href="https://github.com/PsylinksSecurityWeb/libra-browser/issues">Issues</a> · <a href="https://github.com/PsylinksSecurityWeb/libra-browser/security/advisories/new">Report a vulnerability</a></p>
 
 > **Beta:** Libra Browser is still being built. Small errors can happen, and we improve it every day. The AI Agent is a beta feature too, so check its work before you submit anything important.
 >
 > **License:** open source under Apache-2.0. You may modify and redistribute it under the license terms; preserve the required copyright and NOTICE information. See [LICENSE](LICENSE).
 
-## AI browser agent (beta)
-
-Libra Browser includes an optional, **off-by-default AI browser agent**. Bring your own API key or connect a local Ollama model, then ask it to read pages, summarize research, fill forms from your notes, click controls, and upload files you explicitly place in its Files folder. It works inside the browser while you watch.
-
-The agent is designed for supervised browser automation: it does not type passwords, payment-card numbers, security codes, or CAPTCHA answers; it asks before submissions, downloads, navigation, and other risky actions; and it is disabled in private windows and Child Safety mode. Read the full [AI Agent guide](AGENT.md) before enabling this beta feature.
-
-## How to get Libra Browser and what to expect on first launch
-
-Download Libra Browser only from the official [GitHub Releases page](https://github.com/PsylinksSecurityWeb/libra-browser/releases). When the 3.9.2 Windows installer is published, the release page will contain the single official `.exe` and its SHA-256 checksum. Do not download browser installers from mirrors, file-sharing sites, social-media links, or unofficial repackagers.
-
-The beta is not code-signed yet, so Windows may display **Unknown Publisher** or **Windows protected your PC**. Before proceeding, confirm that the filename and SHA-256 match the values shown on the official release page. If they match and you intentionally downloaded the file from the official GitHub release, select **More info → Run anyway**. If the checksum does not match, the file is renamed, or it came from another site, do not run it.
-
-The current Windows build uses a small per-user installer. It does not require administrator rights, does not silently change the Windows default browser, and installs under the user profile. After installation, Libra Browser runs as a normal user application.
-
-## Limitations to know before you switch
-
-Libra Browser currently supports **64-bit Windows 10 and Windows 11 only**. It is not supported on macOS, Linux, Windows 7, Windows 8, Windows XP, or 32-bit Windows. Do not try to bypass these limits with unofficial compatibility layers or repackaged builds; they have not been security-tested by Psylinks Security.
-
-This is beta software. Some sites, forms, downloads, privacy protections, and AI-agent workflows may have rough edges. The AI browser agent is optional and off by default; review its work and do not rely on it for financial, legal, medical, or other safety-critical decisions. Code signing is on the roadmap.
-
-The current release uses Microsoft WebView2. Psylinks Security is also working on an independent browser engine called **Iron**. Iron is future work, is not included in this beta, and should not be treated as an available replacement engine until an official release and security review are published.
-
 ## Why Libra Browser
 - **Blocks ads and trackers at the DNS layer.** Every site name is looked up through our own DNS-over-HTTPS server, so trackers are refused *before* a connection exists. Less data, less CPU, faster pages.
 - **Three levels per site:** Off, Balanced, Max, one tap from the shield icon. Fix a broken site without turning protection off everywhere.
 - **Built for old and small PCs.** One small `.exe` on top of the Edge WebView2 runtime that Windows already uses, tab sleeping, a low-end mode, and a first-run animation that skips itself on weak machines.
-- **Private by design.** No account, no cloud sync, no analytics, no tracking. Your history, bookmarks and passwords never leave the PC. The new-tab page can show a few clearly labelled *sponsored* links and a sponsored picture (see below); you can switch them off in one click.
+- **Private by design.** No account, no cloud sync, no analytics, no tracking. Your history, bookmarks and passwords never leave the PC. The public 3.9.4 build does not show sponsored content; the signed-feed code is disabled until a publisher-controlled endpoint and public keys are verified.
 - **Security defaults that matter:** popups need a real click, downloads started by a page without a click are refused, permissions default to *ask*, motion sensors are always blocked, https upgrade, fingerprint protection, Mark-of-the-Web on downloads.
-- **Clean, flat, calm UI.** White canvas, no shadows, no clutter. Sponsored items are always labelled.
+- **Clean, flat, calm UI.** White canvas, no shadows, no clutter. Sponsored items are disabled in this public build.
 
 ## Screenshots
 
-Explore the browser before installing: the gallery shows the start page, privacy controls, search, settings, downloads, and the first-run experience.
+**First launch**
 
-| Start page | Privacy report |
-|---|---|
-| ![Libra Browser start page](docs/screenshots/new-tab.png) | ![Libra Browser privacy report](docs/screenshots/privacy-report.png) |
+![Launch: blocked trackers](docs/screenshots/launch-1-protect.png)
+![Launch: choose your search](docs/screenshots/launch-3-search.png)
+![Launch: your data stays on this PC](docs/screenshots/launch-5-protected.png)
 
-| Settings | Browsing |
-|---|---|
-| ![Libra Browser settings](docs/screenshots/settings.png) | ![Libra Browser browsing view](docs/screenshots/browsing.png) |
+**Assistant** (optional, uses your own API key; the screenshots show it opening a page, answering a question and filling a Google Form without submitting it)
 
-![Libra Browser search engines](docs/screenshots/search-engines.png)
+![Assistant answers a question](docs/screenshots/assistant-question.png)
+![Assistant fills a form](docs/screenshots/assistant-form-working.png)
+![Assistant finished, form not submitted](docs/screenshots/assistant-form-done.png)
 
-| First-click protection | Search selection |
-|---|---|
-| ![Libra Browser protected from the first click](docs/screenshots/launch-protected.png) | ![Libra Browser search selection](docs/screenshots/launch-search.png) |
+**Protection and tools**
+
+![Shield popup](docs/screenshots/shield-popup.png)
+![Screenshot tool](docs/screenshots/screenshot-tool.png)
+![Privacy page](docs/screenshots/privacy.png)
+
+**Pages**
+
+![New tab](docs/screenshots/home.png)
+![Settings](docs/screenshots/settings.png)
+![History](docs/screenshots/history.png)
+
+## New in Libra Browser 3.9.4 beta
+
+- **Libra Meter:** an optional local CPU, disk, memory, and battery meter that can run separately from the browser. It is off by default, reads Windows counters only, and sends nothing.
+- **Colour mode:** choose an accent colour for the toolbar, tabs, address bar, icons, and internal pages.
+- **Libra Pop:** a local bubble game shown on the offline error page while you wait for a connection. It uses no network or files.
+- **More privacy controls:** optional Microsoft Recall exclusion, history-retention choices, and web notifications refused by default.
+- **Faster screenshots:** visible, full-page, and selected-area PNG capture with a cancel control. Screenshots are saved locally and never uploaded.
+
+## 3.9.4 screenshots
+
+![Libra Browser assistant](docs/screenshots/assistant.png)
+![Libra Browser assistant question](docs/screenshots/assistant-question.png)
+![Libra Browser assistant form working](docs/screenshots/assistant-form-working.png)
+![Libra Browser assistant form boxes](docs/screenshots/assistant-form-boxes.png)
+![Libra Browser assistant form done](docs/screenshots/assistant-form-done.png)
+![Libra Browser history](docs/screenshots/history.png)
+![Libra Browser home](docs/screenshots/home.png)
+![Libra Browser launch 1 protect](docs/screenshots/launch-1-protect.png)
+![Libra Browser launch 2 privacy](docs/screenshots/launch-2-privacy.png)
+![Libra Browser launch 4 default](docs/screenshots/launch-4-default.png)
+![Libra Browser privacy](docs/screenshots/privacy.png)
+![Libra Browser screenshot tool](docs/screenshots/screenshot-tool.png)
+![Libra Browser shield popup](docs/screenshots/shield-popup.png)
 
 ## Features
 **Protection**
@@ -78,19 +86,11 @@ Explore the browser before installing: the gallery shows the start page, privacy
 - Password vault (Windows DPAPI) with a strong password generator and tap-to-fill
 - Fast downloads: segmented multi-connection, resume after failure, live speed
 - **AI Agent (beta)**, off by default: bring your own API key; it can fill forms and read pages for you, asks before anything risky, never types passwords or card numbers, never solves CAPTCHAs. See [AGENT.md](AGENT.md)
-- **Sponsored content (optional, off in one click):** up to 2 labelled tiles and one background picture on the new-tab page, hand-approved by us, no ad network and no tracking pixels. The browser fetches one signed list a day (no cookies, no ID, nothing about you); what is shown is chosen on your PC; the list is checked against a public key built into the app, so nobody else can push a link. Settings > Privacy > "Show sponsored content". Never shown in private windows or Child Safety mode.
+- **Sponsored content (disabled in 3.9.4):** the signed-feed implementation is present for future publisher-controlled use, but the public build has no feed address or public key configured. It fetches nothing, shows nothing, and sends no sponsored-content counts. See [SPONSORED.md](SPONSORED.md) and [SENDS.md](SENDS.md).
 - **Auto suggest (optional, no AI, this PC only):** click an empty name, e-mail, phone or company box and Libra offers the matching value from your own saved notes in its own popup; click it to type it. Opens only after a real click or Tab key, never for passwords, user names, cards or ID numbers, never on sign-in forms. See [AGENT.md](AGENT.md)
 - "Clear browsing data": tick boxes and a time range; each kind is cleared and checked, anything left is swept again, and the result shows real numbers or what failed. Your API key, bookmarks and saved logins are never touched
 - "Save videos" helper and right-click save for images, links and PDFs (off by default)
 - History, Bookmarks, Downloads, Tabs manager, pinned tabs, Light mode, set as default browser
-
-## New in Libra Browser 3.9.2 beta
-
-- **Screenshot capture:** save the visible page, a full page, or a selected area as a local PNG. Nothing is uploaded.
-- **Safer downloads:** risky downloaded programs are held behind Windows Security checks until you explicitly release them; supported Windows Sandbox inspection is available for held files.
-- **Ask before saving:** downloads and save helpers show a Windows Save dialog before fetching content.
-- **Privacy hardening:** optional Global Privacy Control, tracking-parameter stripping, UTC time-zone masking, window-name clearing across sites, and startup clearing with an explicit stay-signed-in list.
-- **Burn:** a clearly confirmed reset removes browsing data and assistant data; bookmarks, saved logins, settings, and the encrypted API key are intentionally retained.
 
 ## How Libra Browser is different
 | | **Libra Browser** | Chrome | Edge | Brave | Firefox | AVG Secure Browser |
@@ -106,7 +106,7 @@ Explore the browser before installing: the gallery shows the start page, privacy
 
 **Honest trade-offs.** Libra Browser is young and focused. It has no extensions, no sync and no mobile or macOS version. It is not an antivirus: it relies on SmartScreen and Windows Defender for file scanning. Because it runs on Microsoft's WebView2, engine security updates come through the WebView2 runtime, and that runtime keeps a background connection to Microsoft that Libra Browser cannot route (see [SECURITY-AUDIT.md](SECURITY-AUDIT.md)).
 
-**Where Libra Browser wins:** a "security browser" you can *read*; protection that works before connections are made (so it also saves bandwidth and CPU); per-site control; and a deliberately small surface: nothing to sign in to, nothing to sync, and only labelled, switchable sponsored links.
+**Where Libra Browser wins:** a "security browser" you can *read*; protection that works before connections are made (so it also saves bandwidth and CPU); per-site control; and a deliberately small surface: nothing to sign in to, nothing to sync, and no sponsored feed enabled in this public build.
 
 *Competitor cells describe publicly documented features as we understand them; please check each vendor for current details.*
 
@@ -123,7 +123,7 @@ Explore the browser before installing: the gallery shows the start page, privacy
 The full list of services and licenses is in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
 
 ## Developer guide
-**Requirements:** Windows 10/11, Visual Studio Build Tools (MSVC + Windows SDK), and the Edge WebView2 Runtime. The NuGet packages (WebView2 SDK, WIL) are restored automatically.
+**Requirements:** Windows 10/11, Visual Studio Build Tools 2026 (MSVC toolset v145 + Windows SDK; with Visual Studio 2022 run `set TOOLSET=v143` before `build.bat`), and the Edge WebView2 Runtime. The NuGet packages (WebView2 SDK, WIL) are restored automatically.
 
 **Build**
 ```bat
@@ -151,7 +151,7 @@ Or open `LibraBrowser/LibraBrowser.vcxproj` and build **Release | x64**. Output:
 | `Vault.h`, `PwJs.h`, `PwSite.h`, `Passwords.inl` | Password vault (DPAPI), generator, autofill |
 | `Fp.inl` | Fingerprint protection script and the daily changing identity |
 | `Agent.inl`, `AgentPage.h`, `Voice.inl` | AI Agent (beta): chat panel, actions checked by native code, local voice input |
-| `Sponsor.h`, `Sponsor.inl` | Sponsored content: signed-list check, daily fetch, tiles and background, hide |
+| `Sponsor.h`, `Sponsor.inl` | Sponsored content: signed-list check, daily fetch, tiles and background, hide (see `SPONSORED.md`) |
 | `Suggest.h`, `Suggest.inl`, `SgSite.h` | Auto suggest: notes matcher, popup, the small page script |
 | `AdRules.h` | Path rules for ads on a site's own server (refused before the request is sent) |
 | `Verdicts.h` | Local memory of blocked names (hashed, tamper-checked) |
@@ -168,7 +168,7 @@ Or open `LibraBrowser/LibraBrowser.vcxproj` and build **Release | x64**. Output:
 Settings groups and search, sensor and permission notices, offline spelling help, offline voice search, upstream proxy support for VPN and proxy users, code signing.
 
 ## FAQ
-**Is it open source?** Yes. It is licensed under Apache-2.0; preserve the LICENSE, NOTICE, and required attribution information.
+**Is it open source?** Yes. Libra Browser is released under Apache-2.0. You may modify and redistribute it under the license terms; preserve the required copyright and NOTICE information.
 
 **Why not an extension like uBlock Origin?** Libra Browser blocks one level lower (DNS), needs no extension and uses less memory. Libra Browser has no extension system by design.
 

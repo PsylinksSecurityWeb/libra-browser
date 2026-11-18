@@ -10,6 +10,8 @@ struct Tab {
     bool         canFwd   = false;
     bool         incognito = false;
     bool         pinned    = false;
+    int          crashes   = 0;       // page renderer crashes answered by a reload (max 2)
+    bool         lazy      = false;   // restored from the last session or pinned: loads only when it is first shown (up to 30 tabs used to load at once at start-up)
     bool         idleAsked = false;   // already asked 'close this unused tab?'
     DWORD        hiddenSince = 0;   // when the tab was last put in the background (0 = visible)
     bool         suspended   = false;

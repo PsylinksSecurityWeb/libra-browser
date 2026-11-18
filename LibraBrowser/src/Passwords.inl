@@ -125,7 +125,7 @@ void BrowserWindow::ShowPw(int kind, Tab* t, const std::wstring& origin) {
     if (!m_hPw) {
         WNDCLASSEXW wc{ sizeof(wc) }; wc.style = 0; wc.lpfnWndProc = PwProc; wc.hInstance = m_hInst;
         wc.hCursor = LoadCursor(nullptr, IDC_ARROW); wc.lpszClassName = kPwClass; RegisterClassExW(&wc);
-        m_hPw = CreateWindowExW(WS_EX_TOOLWINDOW | WS_EX_TOPMOST | WS_EX_NOACTIVATE, kPwClass, L"", WS_POPUP, 0, 0, 10, 10, m_hWnd, nullptr, m_hInst, nullptr);
+        m_hPw = CreateWindowExW(WS_EX_TOOLWINDOW | WS_EX_TOPMOST | WS_EX_NOACTIVATE, kPwClass, L"", WS_POPUP, 0, 0, 10, 10, m_hWnd, nullptr, m_hInst, nullptr); HideFromRecall(m_hPw);
         SetWindowLongPtrW(m_hPw, GWLP_USERDATA, (LONG_PTR)this);
     }
     bool toast = kind == 3 || kind == 6;

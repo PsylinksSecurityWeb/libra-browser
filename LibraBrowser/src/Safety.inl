@@ -42,7 +42,8 @@ static void FamilyUpstreamFromSetting(const std::wstring& v) {   // setting fami
 }
 void BrowserWindow::ChildLoad() {
     FamilyUpstreamFromSetting(m_set.Get(L"family_dns", L""));
-    m_child = !m_incognito && SafeRecordOn();   // the record wins over settings.ini
+    m_child = !m_incognito && (SafeRecordOn() || m_set.On(L"child_safe"));   // the record wins over settings.ini; and deleting only the registry record (a standard user can) does not switch protection off while settings.ini still says on
+    if (m_child && !SafeRecordOn()) SafeRecordSet(true);   // put the record back
     m_set.Set(L"child_safe", m_child ? L"1" : L"0");
     DohProxy::Get().SetFamily(m_child);
 }

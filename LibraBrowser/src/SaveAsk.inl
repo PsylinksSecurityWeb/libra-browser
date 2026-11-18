@@ -40,7 +40,8 @@ std::wstring BrowserWindow::SaveAskPath(const std::wstring& nameIn) {
     wil::com_ptr<IShellItem> r; if (FAILED(d->GetResult(&r)) || !r) return L"";
     wil::unique_cotaskmem_string p; if (FAILED(r->GetDisplayName(SIGDN_FILESYSPATH, &p)) || !p.get()) return L"";
     std::wstring path = p.get();
-    if (path.size() < 4 || path.size() > 259 || path.compare(0, 2, L"\\\\") == 0) return L"";   // local drives only
+    if (path.size() < 4 || path.size() > 259 || path.compare(0, 2, L"\\\\") == 0) {   // local drives only, and say so (a silent "nothing happened" looks like a broken Save)
+        MessageBoxW(m_hWnd, L"Libra Browser saves downloads on local drives only, with a path shorter than 260 characters.\n\nPlease choose another folder.", L"Save as", MB_OK | MB_ICONINFORMATION); return L""; }
     if (!m_incognito) m_set.Set(L"dl_last_dir", SaveDirOf(path));
     return path;
 }
@@ -53,6 +54,7 @@ void BrowserWindow::SaveNext() {
     std::wstring path;
     if (!r.tab || IndexOf(r.tab) >= 0) path = SaveAskPath(r.name);   // (the tab was closed meanwhile: cancelled, no window)
     g_saveLast = GetTickCount(); g_saveBusy = false;
+    if (path.empty()) for (auto& q : g_saveRecent) if (q.first == r.url) q.second = GetTickCount() - 7000;   // cancelled by the user: asking again for the same file is allowed after 3 s, not 10
     r.cb(path);
     if (!g_saveQ.empty()) SetTimer(m_hWnd, 2060, 1010, nullptr);
 }

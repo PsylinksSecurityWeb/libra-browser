@@ -94,11 +94,12 @@ inline std::string ReadAllRaw(const std::wstring& path) {
     return data;
 }
 inline std::string ReadAll(const std::wstring& path) { std::string d = ReadAllRaw(path); return IsSecretFile(path) ? SecretOpen(d) : d; }
-inline void WriteAllRaw(const std::wstring& path, const std::string& data, bool append) {
+inline bool WriteAllRaw(const std::wstring& path, const std::string& data, bool append) {   // true = everything was written
     HANDLE h = CreateFileW(path.c_str(), append ? FILE_APPEND_DATA : GENERIC_WRITE, 0, nullptr,
                            append ? OPEN_ALWAYS : CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
-    if (h == INVALID_HANDLE_VALUE) return;
-    DWORD wr = 0; WriteFile(h, data.data(), (DWORD)data.size(), &wr, nullptr); CloseHandle(h);
+    if (h == INVALID_HANDLE_VALUE) return false;
+    DWORD wr = 0; BOOL ok = WriteFile(h, data.data(), (DWORD)data.size(), &wr, nullptr); CloseHandle(h);
+    return ok && wr == data.size();
 }
 inline void WriteAll(const std::wstring& path, const std::string& data, bool append = false) {
     if (!IsSecretFile(path)) { WriteAllRaw(path, data, append); return; }
@@ -145,7 +146,10 @@ inline std::wstring UrlEnc(const std::wstring& w) {   // UTF-8 percent-encoding,
     }
     return o;
 }
-inline bool IsHttp(const std::wstring& u) { return u.rfind(L"https://", 0) == 0 || u.rfind(L"http://", 0) == 0; }
+inline bool IsHttp(const std::wstring& u) {   // the scheme is case-insensitive (a typed "HTTPS://Example.com" is a web address, not a search)
+    auto is = [&](const wchar_t* p) { size_t n = wcslen(p); if (u.size() < n) return false; for (size_t i = 0; i < n; ++i) if ((wchar_t)towlower(u[i]) != p[i]) return false; return true; };
+    return is(L"https://") || is(L"http://");
+}
 
 struct Settings {
     std::map<std::wstring, std::wstring> m;
@@ -153,7 +157,10 @@ struct Settings {
     void Save() const { std::string o; for (auto& kv : m) o += ToUtf8(kv.first + L"=" + Flat(kv.second)) + "\n"; WriteAll(DataDir() + L"\\settings.ini", o); }
     std::wstring Get(const std::wstring& k, const std::wstring& d = L"") const { auto it = m.find(k); return it == m.end() ? d : it->second; }
     bool On(const std::wstring& k) const { return Get(k) == L"1"; }
-    void Set(const std::wstring& k, const std::wstring& v) { m[k] = Flat(v); Save(); }
+    // Several Libra processes can run at once (a private window is its own process). Every change first takes the file as the truth, so a stale copy never writes old values back.
+    void Refresh() { const std::wstring p = DataDir() + L"\\settings.ini"; std::string txt = ReadAll(p); if (txt.empty() && !ReadAllRaw(p).empty()) return;   // unreadable right now: keep what we have
+                     std::map<std::wstring, std::wstring> t; for (auto& l : Lines(txt)) { size_t e = l.find(L'='); if (e != std::wstring::npos) t[l.substr(0, e)] = l.substr(e + 1); } if (!t.empty()) m = t; }
+    void Set(const std::wstring& k, const std::wstring& v) { Refresh(); m[k] = Flat(v); Save(); }
 };
 
 inline std::wstring DownloadsDir(const Settings& s) {

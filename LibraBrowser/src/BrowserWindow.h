@@ -29,7 +29,7 @@ public:
     ~BrowserWindow();
 
     bool Create(int nCmdShow);
-    void OpenTab(const std::wstring& url = L"", bool incognito = false);
+    void OpenTab(const std::wstring& url = L"", bool incognito = false, bool background = false);
     void CloseTab(int index);
     void SwitchTab(int index);
     void NavigateTo(const std::wstring& input);    // Smart URL/search
@@ -73,7 +73,7 @@ private:
 
     // â”€â”€â”€ Event handlers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     void OnSize(int cx, int cy);
-    void OnClose();
+    void OnClose(); void SaveState(); void SaveSession(); void OnDpiChanged(UINT dpi, const RECT* r);
     void OnCommand(WPARAM wParam, LPARAM lParam);
     void OnLButtonDown(int x, int y);
     bool OnSetCursor(HWND hwnd, UINT hitTest);
@@ -107,7 +107,7 @@ private:
     void LoadData();
     void RecordHistory(const std::wstring& url, const std::wstring& title);
     void SaveHistory();
-    void SaveBookmarks();
+    void SaveBookmarks(); void ReloadBookmarks();   // reload = take the file as the truth first (a private window runs as a second process with its own copy of the list)
     void ToggleBookmark();
     bool IsBookmarked(const std::wstring& url) const;
     RECT StarRect() const;
@@ -254,6 +254,10 @@ private:
     std::wstring m_privDir;          // private window: throw-away profile folder
 public:
     void NewPrivateWindow();
+    void NewNormalWindow();
+    void ApplyTheme();
+    void HideFromRecall(HWND w);
+    void PruneHistory();
 private:
     bool       m_adBlock     = false;   // local blocking OFF by default; tracker blocking is done by the DoH server
     bool       m_imagesOff   = false;

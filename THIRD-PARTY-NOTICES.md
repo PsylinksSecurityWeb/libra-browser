@@ -1,6 +1,6 @@
 # Third-party notices
 
-Libra Browser itself is under the Libra Source-Available License (see `LICENSE`). It builds on the following; each keeps its own license.
+Libra Browser itself is under the Apache License 2.0 (see `LICENSE`). It builds on the following; each keeps its own license.
 
 | Component | Used for | License |
 |---|---|---|
@@ -28,4 +28,4 @@ Libra Browser itself is under the Libra Source-Available License (see `LICENSE`)
 - whisper.cpp (MIT, https://github.com/ggml-org/whisper.cpp) and the OpenAI Whisper base model weights (MIT): optional offline voice input; downloaded on request, not bundled.
 
 ## Downloaded on request (not part of the Libra Browser exe)
-- **pdf.js 3.11.174** (Apache-2.0, Mozilla) and **pdf-lib 1.17.1** (MIT, Andrew Dillon): used by "Sign a PDF" (Ctrl+Shift+F). The files are downloaded from cdn.jsdelivr.net only after the user requests the feature and are checked against fixed size and SHA-256 values listed in `Pdf.inl`.
+- **pdf.js 3.11.174** (Apache-2.0, Mozilla) and **pdf-lib 1.17.1** (MIT, Andrew Dillon): used by "Sign a PDF" (Ctrl+Shift+F). The user is asked once; the files come from cdn.jsdelivr.net, are checked against a fixed size and SHA-256 (listed in `Pdf.inl`) and kept in the Libra data folder. They run only inside the signer page, which has no network access.

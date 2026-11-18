@@ -1,22 +1,21 @@
-# Sponsored content (optional, off by default in this source)
+# Sponsored content
 
-Libra Browser can show up to 2 labelled sponsored tiles and one background picture on the new-tab page. It is built so a user can see, check and switch it off.
+The sponsored-content implementation is present but disabled in the public 3.9.4 build. It shows no sponsored tiles or background picture and has no network activity until a publisher-controlled feed address and public signing key are verified. Each item can be hidden for 30 days with its Hide button. It is never shown in private windows, with Child Safety on, or during first run. Every item carries the word "Sponsored".
 
-## What it does and does not do
-- One anonymous `GET` of a signed feed per day, through Libra's own DNS-over-HTTPS proxy. No cookies, no redirects, no identifier, nothing about the user or the pages visited is sent.
+## What the browser does and does not do
+- In a build with a verified feed configured, it can fetch one signed feed with a plain `GET`, through Libra's own DNS-over-HTTPS proxy. No cookies, no redirects, no identifier, nothing about the user or the pages visited is sent.
 - The feed is accepted only if its ECDSA P-256 / SHA-256 signature matches a public key built into the browser, it has not expired and its counter (`seq`) did not go back. Otherwise it is ignored.
-- Every click link and picture must live on the feed's own host (`https://<feed host>/c/<id>` for clicks, `https://<feed host>/img/...` for pictures), so a signed feed cannot point the tile click at a third-party tracker. The feed host then redirects to the advertiser.
-- Hidden in private windows, with Child Safety on, during first run, and whenever the user turns it off (Settings > Privacy). Sponsored items are always labelled.
-- No ad network, no tracking pixels, no scripts from advertisers: the browser draws plain tiles itself.
+- The browser chooses what to show on the PC (region comes from the Windows region setting and is never sent). The feed is the same file for everybody, so nothing is sent to pick an ad.
+- If enabled in a separately verified build, a tile opens the advertiser's `https` address directly, plus one constant tag `utm_source=libra` that is the same for every user. Nothing goes through our server when you click. The address must be a plain `https` host name: no login part, no port, no odd characters (`SpGoOk` in `Sponsor.h`).
+- No ad network, no tracking pixels, no advertiser scripts: the browser draws plain tiles itself.
 
-## Turned off in a fresh build
-`LibraBrowser/src/Sponsor.inl`, function `SpConfig()`, holds two things:
-1. `c.feed`: the https address of the feed.
-2. `owner[2]`: two public-key slots (`kid`, base64url `x`, base64url `y`). Both are empty in this source.
+## Anonymous counts (what would be sent back if enabled)
+See [SENDS.md](SENDS.md). In short: how often each item was shown and clicked, and two rounded totals of blocked ads and trackers, in one fixed-size report once a day. No identifier. The user can read the next report on the Privacy page and switch the counts off (the ads stay).
 
-With empty keys the browser fetches nothing and shows nothing. A fork or a later release switches the feature on by filling in its own feed address and public key, then rebuilding.
+## Turned off in this source
+`LibraBrowser/src/Sponsor.inl`, function `SpConfig()`, holds the feed address and two public-key slots (`kid`, base64url `x`, `y`). Both keys are empty in this source, so the browser fetches nothing, shows nothing and sends nothing. A fork or a later release switches the feature on by filling in its own feed address and public key, then rebuilding.
 
 ## Feed format (for people running their own feed)
-The envelope is `{"kid", "payload", "sig"}`. `payload` is the exact JSON text that was signed; `sig` is the raw 64-byte `r||s` signature, base64url. The payload carries `seq`, `issued`, `expires`, `disabled` and a list of items (`id`, `kind`, `title`, `advertiser`, `dest`, `click`, `img`, `start`, `end`, `weight`, `countries`). The exact checks are in `LibraBrowser/src/Sponsor.h` (`SpParse`).
+The envelope is `{"kid", "payload", "sig"}`. `payload` is the exact JSON text that was signed; `sig` is the raw 64-byte `r||s` signature, base64url. The payload carries `seq`, `issued`, `expires`, `disabled` and a list of items (`id`, `kind`, `title`, `advertiser`, `dest`, `go`, `img`, `start`, `end`, `weight`, `countries`). `go` is the advertiser's https address. Pictures must live on the feed's own host. The exact checks are in `LibraBrowser/src/Sponsor.h` (`SpParse`).
 
 The signing server and the private key are not part of this repository. Never put a private key in the source.

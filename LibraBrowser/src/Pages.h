@@ -22,8 +22,7 @@ inline std::wstring PageShell(const std::wstring& title, const std::wstring& bod
     if (sidebar)
         side = L"<aside><div class=brand>LIBRA<span class=beta>BETA</span></div><nav>" +
                NavItem(L"history", L"E81C", L"History", active) + NavItem(L"bookmarks", L"E734", L"Bookmarks", active) + NavItem(L"passwords", L"E72E", L"Passwords", active) +
-               L"<a data-c=nav data-a=agent><i class=ico><svg viewBox=\"0 0 24 24\" width=18 height=18 fill=none stroke=currentColor stroke-width=1.7 stroke-linejoin=round><path d=\"M9 3l1.6 4.4L15 9l-4.4 1.6L9 15l-1.6-4.4L3 9l4.4-1.6z\"/><path d=\"M17 13l.9 2.5 2.6.9-2.6.9L17 20l-.9-2.7-2.6-.9 2.6-.9z\"/></svg></i>Assistant</a>" +
-               NavItem(L"downloads", L"E896", L"Downloads", active) + NavItem(L"privacy", L"E7B3", L"Privacy", active) + NavItem(L"settings", L"E713", L"Settings", active) + L"</nav><div class=made>Built by Psylinks Security Private Limited</div></aside>";
+               NavItem(L"downloads", L"E896", L"Downloads", active) + NavItem(L"privacy", L"E7B3", L"Privacy", active) + NavItem(L"appearance", L"E790", L"Appearance", active) + NavItem(L"settings", L"E713", L"Settings", active) + L"</nav><div class=made>Built by Psylinks Security Private Limited</div></aside>";
     if (!sidebar && footer) side = L"<div class=made style=\"position:fixed;bottom:16px;left:0;right:0;text-align:center\">Built by Psylinks Security Private Limited</div>";
     if (!sidebar) side = L"<style>main{max-width:none}</style>" + side;   // pages without the rail (errors, reader, signer) centre on the window, not on a 900 px column
     return std::wstring(LR"HTML(<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data: https://libra-hero.local; media-src https://libra-hero.local; style-src 'unsafe-inline'; script-src 'unsafe-inline'; form-action https:; base-uri 'none'"><title>)HTML") + Esc(title) + LR"HTML(</title><style>
@@ -65,6 +64,7 @@ input.cb::after{top:1px;left:5.5px;width:5px;height:10px;border:solid #fff;borde
 input.cb:checked{background:#111;border-color:#111}input.cb:checked::after{left:5.5px;transform:rotate(45deg) scale(1)}
 .top{display:flex;gap:12px;margin-bottom:16px}.top input{flex:1;background:var(--card);box-shadow:none}
 .item{display:flex;gap:14px;align-items:center;padding:13px 0}
+.item .t a,.item small,.item .nm{unicode-bidi:isolate}   /* a page title with a right-to-left override can not reorder text outside its own line */
 .t{flex:1;min-width:0}.t a{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--fg);text-decoration:none;font-weight:500}
 .t a:hover{text-decoration:underline}
 .t small{color:var(--mute);display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:2px}
@@ -110,7 +110,15 @@ aside button{background:#f3f3f3}aside button.pri{background:#111}
 .day{padding:18px 0 4px;font-size:11.5px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:#a0a0a0;border-top:1px solid #f0f0f0}.card>.day:first-child{border-top:0;padding-top:14px}
 .empty{padding:48px 20px;text-align:center;color:var(--mute);font-size:14px;line-height:1.5}.empty b{display:block;color:var(--fg);font-size:16px;font-weight:600;margin-bottom:4px}
 .card:has(>.empty){padding:0}
-</style></head><body>)HTML" + side + L"<main>" + body + LR"HTML(</main><script>
+</style></head><body>)HTML" + side + L"<main>" + body + LR"HTML(</main><style>@media(max-width:860px){   /* narrow window (half-screen snap, small laptop): the rail becomes a top strip, rows wrap, nothing runs past the edge */
+body:has(aside){flex-direction:column}
+aside{width:auto;height:auto;position:static;flex-direction:row;align-items:center;gap:6px;padding:10px 14px;border-right:0;border-bottom:1px solid #eee;overflow-x:auto}
+aside::-webkit-scrollbar{display:none}.brand,.made{display:none}nav{margin:0;display:flex;gap:2px}nav a{padding:9px 12px;margin:0;white-space:nowrap}
+body:has(aside) main{padding:20px 18px 60px;max-width:none}
+.top,.row,.card .row,.ctl,.rg,.seg,.acts,.bt{flex-wrap:wrap!important}.row,.card .row{gap:12px!important}
+main .card .row input[type=text],main .card .row input[type=password],main .card .row select,main .top input{width:100%!important;min-width:0!important;max-width:100%}
+.item{min-width:0}.item .t{min-width:0}img,svg,canvas{max-width:100%}
+}</style><script>
 const P=(...a)=>chrome.webview.postMessage(a.join('\t'));
 document.addEventListener('click',e=>{const b=e.target.closest('[data-c]');if(b){if(b.dataset.c==='nav'&&b.dataset.a!=='agent'&&!b.classList.contains('on')){document.querySelectorAll('nav a.on').forEach(x=>x.classList.remove('on'));b.classList.add('on');const m=document.querySelector('main');if(m){m.classList.add('lv');setTimeout(()=>m.classList.remove('lv'),1500)}}P(b.dataset.c,b.dataset.a||'')}});
 document.addEventListener('change',e=>{const t=e.target;if(t.dataset.k)P('set',t.dataset.k,t.type=='checkbox'?(t.checked?'1':'0'):t.value)});
@@ -134,18 +142,8 @@ inline std::wstring Toggle(const Settings& s, const wchar_t* k, const wchar_t* l
 inline std::wstring ToggleOn(const Settings& s, const wchar_t* k, const wchar_t* label, const wchar_t* sub, const wchar_t* def = L"1") {   // on unless set to 0
     return std::wstring(L"<div class=row><div><span class=lbl>") + label + L"</span><small>" + sub + L"</small></div><input type=checkbox data-k=" + k + (s.Get(k, def) != L"0" ? L" checked" : L"") + L"></div>";
 }
-inline std::wstring SettingsPage(const Settings& s, bool grey, const std::wstring& cloud = L"On", long long blocked = 0) {
-    std::wstring eng = s.Get(L"engine", L"Google"), st = s.Get(L"startup", L"home");
-    bool cs = s.Get(L"child_safe", L"0") == L"1";
-    auto row = [](const std::wstring& lbl, const std::wstring& sub, const std::wstring& ctl) { return L"<div class=row><div><span class=lbl>" + lbl + L"</span>" + (sub.empty() ? std::wstring() : L"<small>" + sub + L"</small>") + L"</div>" + ctl + L"</div>"; };
-    auto sec = [](const wchar_t* id, const wchar_t* title, const std::wstring& body) { return std::wstring(L"<h2 id=\"") + id + L"\">" + title + L"</h2><div class=card>" + body + L"</div>"; };
-    auto grp = [](const wchar_t* t) { return std::wstring(L"<div class=sub>") + t + L"</div>"; };
-    auto txt = [&](const wchar_t* key, const wchar_t* ph) { return std::wstring(L"<input type=text data-k=") + key + L" placeholder=\"" + ph + L"\" value=\"" + Esc(s.Get(key)) + L"\">"; };
-    auto btn = [](const wchar_t* label, const wchar_t* c, const wchar_t* a) { return std::wstring(L"<button data-c=") + c + L" data-a=" + a + L">" + label + L"</button>"; };
-    auto info = [](const wchar_t* title, const wchar_t* body) { return std::wstring(L"<details class=info><summary>") + title + L"</summary><div class=body>" + body + L"</div></details>"; };
-    auto opt = [](const wchar_t* v, const wchar_t* label, const std::wstring& cur) { return std::wstring(L"<option value=") + v + (cur == v ? L" selected" : L"") + L">" + label + L"</option>"; };
-    std::wstring b = LR"H(<style>
-.chips{position:sticky;top:0;z-index:5;display:flex;gap:6px;flex-wrap:wrap;padding:12px 0;margin:-6px 0 4px;background:rgba(255,255,255,.94);backdrop-filter:blur(8px)}
+static const wchar_t* kSetCss = LR"H(<style>
+.chips{position:sticky;top:0;z-index:5;display:flex;gap:6px;flex-wrap:wrap;padding:12px 0;margin:-6px 0 4px;background:var(--chipbg,rgba(255,255,255,.94));backdrop-filter:blur(8px)}
 .chips a{padding:6px 14px;border-radius:999px;background:#f3f3f3;color:#444;font-size:13px;cursor:pointer;user-select:none;transition:background .15s,color .15s}.chips a:hover{background:#111;color:#fff}
 main h2{scroll-margin-top:62px;margin:30px 0 10px 4px}
 .card{padding:2px 22px}
@@ -162,7 +160,18 @@ details.info summary::-webkit-details-marker{display:none}details.info summary::
 details.info .body{padding:0 0 16px;color:#777;font-size:13px;line-height:1.6;max-width:640px}
 .sub+.row{border-top:0!important}.chips a.on{background:#111;color:#fff}
 .foot{padding:14px 0 16px!important;margin:0!important;border-top:1px solid #f0f0f0}
-</style><h1>Settings</h1><p class=bnote>Beta: small errors can happen. We improve Libra every day.</p>
+</style>)H";
+inline std::wstring SettingsPage(const Settings& s, bool grey, const std::wstring& cloud = L"On", long long blocked = 0) {
+    std::wstring eng = s.Get(L"engine", L"Google"), st = s.Get(L"startup", L"home");
+    bool cs = s.Get(L"child_safe", L"0") == L"1";
+    auto row = [](const std::wstring& lbl, const std::wstring& sub, const std::wstring& ctl) { return L"<div class=row><div><span class=lbl>" + lbl + L"</span>" + (sub.empty() ? std::wstring() : L"<small>" + sub + L"</small>") + L"</div>" + ctl + L"</div>"; };
+    auto sec = [](const wchar_t* id, const wchar_t* title, const std::wstring& body) { return std::wstring(L"<h2 id=\"") + id + L"\">" + title + L"</h2><div class=card>" + body + L"</div>"; };
+    auto grp = [](const wchar_t* t) { return std::wstring(L"<div class=sub>") + t + L"</div>"; };
+    auto txt = [&](const wchar_t* key, const wchar_t* ph) { return std::wstring(L"<input type=text data-k=") + key + L" placeholder=\"" + ph + L"\" value=\"" + Esc(s.Get(key)) + L"\">"; };
+    auto btn = [](const wchar_t* label, const wchar_t* c, const wchar_t* a) { return std::wstring(L"<button data-c=") + c + L" data-a=" + a + L">" + label + L"</button>"; };
+    auto info = [](const wchar_t* title, const wchar_t* body) { return std::wstring(L"<details class=info><summary>") + title + L"</summary><div class=body>" + body + L"</div></details>"; };
+    auto opt = [](const wchar_t* v, const wchar_t* label, const std::wstring& cur) { return std::wstring(L"<option value=") + v + (cur == v ? L" selected" : L"") + L">" + label + L"</option>"; };
+    std::wstring b = std::wstring(kSetCss) + LR"H(<h1>Settings</h1><p class=bnote>Beta: small errors can happen. We improve Libra every day.</p>
 <div class=chips><a data-go=s-search>Search</a><a data-go=s-start>Startup</a><a data-go=s-dl>Downloads</a><a data-go=s-priv>Privacy</a><a data-go=s-perf>Performance</a><a data-go=s-ai>Assistant</a><a data-go=s-fam>Family</a><a data-go=s-about>About</a></div>)H";
     // Search
     std::wstring e = L"<select data-k=engine>"; for (auto& k : kEngines) if (!k.ai) e += opt(k.name, k.name, eng); e += L"<optgroup label=\"AI search\">"; for (auto& k : kEngines) if (k.ai) e += opt(k.name, k.name, eng); e += L"</optgroup>" + opt(L"Custom", L"Custom...", eng) + L"</select>";
@@ -175,7 +184,7 @@ details.info .body{padding:0 0 16px;color:#777;font-size:13px;line-height:1.6;ma
     b += sec(L"s-dl", L"Downloads", row(L"Save to", L"Empty means your Downloads folder", txt(L"dl_dir", L"Downloads folder")) + L"<div class=row><div><span class=lbl>Ask where to save</span><small>Libra always asks. Nothing is downloaded until you press Save.</small></div><span style=\"color:#8a8a8a;font-size:13px;width:236px;text-align:right\">Always on</span></div>"
         + Toggle(s, L"save_video", L"Save videos", L"A quiet icon in the address bar when a page has a video"));
     // Privacy
-    std::wstring bd = s.Get(L"block_default", L"0");
+    std::wstring bd = s.Get(L"block_default", L"0"); std::wstring hk = s.Get(L"history_keep", L"");
     b += sec(L"s-priv", L"Privacy",
         L"<div class=stats><div class=stat><b>" + cloud + L"</b><span>Cloud ad blocking</span></div><div class=stat><b>" + std::to_wstring(blocked) + L"</b><span>ads and trackers blocked</span></div></div>"
         + grp(L"Protection")
@@ -185,12 +194,14 @@ details.info .body{padding:0 0 16px;color:#777;font-size:13px;line-height:1.6;ma
         + Toggle(s, L"block_3p", L"Block third-party cookies", L"Off by default: can break some CAPTCHAs and sign-ins. Restart to apply")
         + ToggleOn(s, L"fp_a11y", L"Hide accessibility preferences", L"Sites cannot read your contrast and motion settings (Max level)")
         + Toggle(s, L"tz_utc", L"Hide my time zone", L"Sites see UTC. Times on booking sites will show in UTC")
+        + Toggle(s, L"block_recall", L"Block Microsoft Recall", L"Windows cannot take pictures of Libra windows. Screen sharing and recorders will also see a black window")
         + Toggle(s, L"local_block", L"Local ad blocker", L"An extra layer. Open a new tab after changing")
         + grp(L"Permissions")
         + Toggle(s, L"perm_allow", L"Allow camera, microphone and location", L"Off (recommended): Libra asks every time. Motion sensors stay blocked")
         + Toggle(s, L"smartscreen_off", L"Turn off Microsoft SmartScreen", L"More private, less protection: it sends site addresses to Microsoft")
         + ToggleOn(s, L"web_suggest", L"Search suggestions", L"Your search engine suggests words while you type")
         + grp(L"Your data")
+        + row(L"Keep my history", L"Older pages are removed from this PC automatically", L"<select data-k=history_keep>" + opt(L"", L"Forever", hk) + opt(L"365", L"1 year", hk) + opt(L"90", L"3 months", hk) + opt(L"30", L"1 month", hk) + opt(L"7", L"1 week", hk) + opt(L"1", L"1 day", hk) + opt(L"0", L"Do not keep", hk) + L"</select>")
         + Toggle(s, L"clear_start", L"Clear site data at startup", L"A fresh start every time. Sign-ins are lost except the sites below")
         + row(L"Stay signed in on", L"Sites whose cookies are kept, separated by commas", txt(L"keep_signin", L"google.com, github.com"))
         + row(L"Browsing data", L"History, cookies, sign-ins, cache and more", btn(L"Clear data...", L"nav", L"privacy"))
@@ -205,7 +216,7 @@ details.info .body{padding:0 0 16px;color:#777;font-size:13px;line-height:1.6;ma
     b += sec(L"s-ai", L"Assistant",
         Toggle(s, L"agent_on", L"Assistant", L"Give Libra a job such as filling a form. While off, nothing runs")
         + ToggleOn(s, L"agent_btn", L"Toolbar button", L"Show the Assistant button in the toolbar (Ctrl+Shift+Space opens it)")
-        + row(L"Connection", conn, btn(L"Open", L"nav", L"agent"))
+        + row(L"Connection", conn, L"")
         + Toggle(s, L"autosuggest", L"Auto suggest", L"Offer your saved notes when you click an empty name or e-mail box. Works on this PC only")
         + ToggleOn(s, L"agent_opt", L"Shorten my requests", L"Remove filler words so each job uses fewer tokens")
         + ToggleOn(s, L"agent_vauto", L"Send voice requests automatically", L"Send the text right after you speak")
@@ -220,12 +231,39 @@ details.info .body{padding:0 0 16px;color:#777;font-size:13px;line-height:1.6;ma
     b += sec(L"s-fam", L"Family", row(L"Child Safety mode", std::wstring(cs ? L"On. Adult, malware and scam sites are blocked. Turning it off needs your Windows password" : L"Blocks adult, malware and scam sites. Needs your Windows password")
         + (s.Get(L"child_nolock", L"0") == L"1" ? L" Your Windows account has no password, so anyone can turn this off." : L""), std::wstring(L"<button data-c=family.toggle>") + (cs ? L"Turn off" : L"Turn on") + L"</button>"));
     // About
-    b += sec(L"s-about", L"About", row(L"Libra Browser", L"Version 3.9.2 (beta). Secure, private and lightweight. Built by Psylinks Security Private Limited", L"")
+    b += sec(L"s-about", L"About", row(L"Libra Browser", L"Version 3.9.4 (beta). Secure, private and lightweight. Built by Psylinks Security Private Limited", L"")
         + info(L"What Libra does", L"Blocks ads and trackers before they load. Upgrades sites to secure https. Blocks popups and downloads you did not ask for. Hides your browser fingerprint. Keeps a password vault and generator. Fast multi-connection downloads. Private windows that leave nothing behind. Light on memory and CPU. We collect nothing about you. The new-tab page shows clearly labelled sponsored items that support Libra. Anonymous counts can be switched off on the Privacy page.")
         + info(L"License", L"Open source under Apache-2.0. Preserve the LICENSE, NOTICE, and required attribution information.")
         + row(L"Source code", L"<a href=\"https://github.com/PsylinksSecurityWeb/libra-browser\" style=\"color:inherit\">github.com/PsylinksSecurityWeb/libra-browser</a>", L""));
     return PageShell(L"Settings", b, grey, LR"JS(document.querySelectorAll('.chips a').forEach(a=>a.onclick=()=>{const t=document.getElementById(a.dataset.go);if(t)t.scrollIntoView({behavior:'smooth',block:'start'})});const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting)document.querySelectorAll('.chips a').forEach(a=>a.classList.toggle('on',a.dataset.go===e.target.id))}),{rootMargin:'-70px 0px -70% 0px'});document.querySelectorAll('main h2[id]').forEach(h=>io.observe(h));)JS", L"settings");
 }
+
+// libra://appearance : colour mode (more look-and-feel options will live here)
+inline std::wstring AppearancePage(const Settings& s, bool grey) {
+    auto sel = [](const wchar_t* v, const wchar_t* t, const std::wstring& cur) { return std::wstring(L"<option value=") + v + (cur == v ? L" selected" : L"") + L">" + t + L"</option>"; };
+    std::wstring ms = s.Get(L"meter_size", L"pill"), mo = s.Get(L"meter_opacity", L"100");
+    std::wstring b = std::wstring(kSetCss) + L"<h1>Appearance</h1><p class=bnote>Make Libra look the way you like.</p><h2 id=\"s-look\">Color</h2><div class=card>" + L"<style>#hu{-webkit-appearance:none;appearance:none;height:12px;border-radius:6px}#hu::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;border-radius:50%;background:#fff;border:2px solid #111;cursor:pointer}</style><div class=row><div><span class=lbl>Color mode</span><small>Pick any colour: the toolbar, tabs, address bar, icons and pages follow it</small></div><div style=\"display:flex;flex-direction:column;gap:10px;align-items:flex-end\"><div id=sw style=\"display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;max-width:260px\"></div><canvas id=sv width=240 height=140 style=\"border-radius:12px;cursor:crosshair;touch-action:none\"></canvas><input id=hu type=range min=0 max=360 style=\"width:240px;accent-color:#111\"><div style=\"display:flex;gap:8px\"><input id=hx type=text maxlength=7 style=\"width:96px\"><button id=rs class=btn>Default</button></div></div></div>" + L"</div><h2 id=\"s-meter\">PC meter</h2><div class=card>" + Toggle(s, L"meter_on", L"Libra Meter", L"A tiny live meter of how hard your PC is working. It keeps running after you close the browser. Powered by Libra Browser.")
+        + L"<div class=row><div><span class=lbl>Size</span><small>Double-click the meter to switch too</small></div><select data-k=meter_size>" + sel(L"pill", L"Compact", ms) + sel(L"card", L"With details", ms) + L"</select></div>"
+        + ToggleOn(s, L"meter_dock", L"Hide at the screen edge", L"The meter tucks into the nearest edge as a thin colour strip (green, blue, amber, red = load). Touch the strip with the mouse and it slides out")
+        + ToggleOn(s, L"meter_top", L"Always on top", L"Stays above other windows. Drag it anywhere; it snaps to screen edges")
+        + L"<div class=row><div><span class=lbl>See-through</span><small>Lower numbers let the screen show through</small></div><select data-k=meter_opacity>" + sel(L"100", L"Solid", mo) + sel(L"85", L"Light", mo) + sel(L"70", L"Glass", mo) + sel(L"50", L"Ghost", mo) + L"</select></div>"
+        + Toggle(s, L"meter_start", L"Start with Windows", L"Opens quietly when you sign in. Turn it off here any time")
+        + L"<div class=row><div><small>The meter reads Windows counters on this PC only. It sends nothing anywhere. CPU temperature is not shown: Windows does not offer a safe reading.</small></div></div></div>";
+    return PageShell(L"Appearance", b, grey, std::wstring(L"window.__acc=\"") + s.Get(L"accent") + L"\";" + LR"JS((()=>{const cv=document.getElementById('sv');if(!cv)return;const g=cv.getContext('2d'),hu=document.getElementById('hu'),hx=document.getElementById('hx'),sw=document.getElementById('sw');let H=0,S=0,V=.4;
+const rgb=(h,s,v)=>{const f=n=>{const k=(n+h/60)%6;return v-v*s*Math.max(0,Math.min(k,4-k,1))};return[f(5),f(3),f(1)].map(x=>Math.round(x*255))};
+const hex=()=>'#'+rgb(H,S,V).map(x=>x.toString(16).padStart(2,'0')).join('');
+function parse(c){const m=/^#([0-9a-f]{6})$/i.exec(c);if(!m)return false;const r=parseInt(m[1].slice(0,2),16)/255,q=parseInt(m[1].slice(2,4),16)/255,b=parseInt(m[1].slice(4),16)/255,mx=Math.max(r,q,b),d=mx-Math.min(r,q,b);V=mx;S=mx?d/mx:0;H=d?(mx==r?((q-b)/d+6)%6:mx==q?(b-r)/d+2:(r-q)/d+4)*60:0;return true}
+function draw(){const w=cv.width,h=cv.height;g.fillStyle='hsl('+H+',100%,50%)';g.fillRect(0,0,w,h);let a=g.createLinearGradient(0,0,w,0);a.addColorStop(0,'#fff');a.addColorStop(1,'rgba(255,255,255,0)');g.fillStyle=a;g.fillRect(0,0,w,h);a=g.createLinearGradient(0,0,0,h);a.addColorStop(0,'rgba(0,0,0,0)');a.addColorStop(1,'#000');g.fillStyle=a;g.fillRect(0,0,w,h);const x=S*w,y=(1-V)*h;g.lineWidth=2;g.strokeStyle='#fff';g.beginPath();g.arc(x,y,7,0,6.3);g.stroke();g.lineWidth=1;g.strokeStyle='#000';g.beginPath();g.arc(x,y,8.5,0,6.3);g.stroke();hx.value=hex();hu.value=H}
+const save=()=>P('set','accent',hex());let dn=false;
+const at=e=>{const r=cv.getBoundingClientRect();S=Math.min(1,Math.max(0,(e.clientX-r.left)/r.width));V=1-Math.min(1,Math.max(0,(e.clientY-r.top)/r.height));draw()};
+cv.onpointerdown=e=>{dn=true;at(e);try{cv.setPointerCapture(e.pointerId)}catch(x){}};cv.onpointermove=e=>{if(dn)at(e)};cv.onpointerup=()=>{if(dn){dn=false;save()}};
+hu.style.background='linear-gradient(90deg,#f00,#ff0,#0f0,#0ff,#00f,#f0f,#f00)';hu.oninput=()=>{H=+hu.value;draw()};hu.onchange=save;
+hx.onchange=()=>{if(parse(hx.value)){draw();save()}};document.getElementById('rs').onclick=()=>P('set','accent','');
+['#e5484d','#f76b15','#f5a524','#30a46c','#12a594','#3e7bfa','#6e56cf','#d6409f','#6b7280'].forEach(c=>{const b=document.createElement('button');b.style.cssText='width:24px;height:24px;padding:0;min-width:0;flex:none;border-radius:50%;border:2px solid #fff;outline:1px solid #ddd;cursor:pointer;background:'+c;b.onclick=()=>{parse(c);draw();save()};sw.appendChild(b)});
+if(!parse(window.__acc||''))parse('#6b7280');draw()})();
+)JS", L"appearance");
+}
+
 
 inline std::wstring HistoryPage(const std::vector<HistoryItem>& h, bool grey) {
     std::wstring b = LR"H(<style>#cm{display:none;position:fixed;inset:0;background:rgba(255,255,255,.78);z-index:9;align-items:center;justify-content:center}#cm .box{background:#fff;border:1px solid #e6e6e6;border-radius:18px;width:460px;max-width:92vw;max-height:90vh;overflow:auto;padding:24px 26px}
@@ -494,6 +532,7 @@ inline std::wstring TabsPage(const std::vector<TabInfo>& t, bool grey) {
     return PageShell(L"Tabs", b, grey, L"q.oninput=()=>{const v=q.value.toLowerCase();document.querySelectorAll('.item').forEach(i=>i.style.display=i.textContent.toLowerCase().includes(v)?'':'none')}", L"tabs");
 }
 
+#include "PopGame.h"
 inline std::wstring ErrorPage(const std::wstring& kind, const std::wstring& host, const std::wstring& url, bool grey) {
     struct K { const wchar_t* k; const wchar_t* glyph; const wchar_t* title; const wchar_t* text; };
     static const K T[] = {
@@ -518,5 +557,7 @@ inline std::wstring ErrorPage(const std::wstring& kind, const std::wstring& host
     b += L"</div>";
     if (kind == L"cert") b += L"<small>Only continue if you trust this site. Anything you type could be seen by others.</small>";
     b += L"</div>";
-    return PageShell(L"Can't open " + host, b, grey, L"", L"", false);
+    bool net = kind == L"offline" || kind == L"dns" || kind == L"timeout" || kind == L"conn";   // Libra Pop shows only when the PC really is offline (the page checks navigator.onLine)
+    if (net) b += kPopHtml;
+    return PageShell(L"Can't open " + host, b, grey, net ? std::wstring(kPopJs) : std::wstring(), L"", false);
 }

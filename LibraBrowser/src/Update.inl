@@ -51,7 +51,7 @@ void BrowserWindow::UpAct(const std::wstring& what) {
         if (!SpGet(port, direct, FromUtf8(u.url), (size_t)u.size + 4096, body, true)) r->err = "download failed";
         else if ((long long)body.size() != u.size || body.size() < 2 || body[0] != 'M' || body[1] != 'Z') r->err = "the file is not the expected installer";
         else if (UpSha256(body) != u.sha) r->err = "the file does not match the signed checksum, so it was thrown away";
-        else { CreateDirectoryW(dir.c_str(), nullptr); r->path = dir + L"\\LibraBrowser-Setup-" + FromUtf8(u.ver) + L".exe"; WriteAllRaw(r->path, body, false); }
+        else { CreateDirectoryW(dir.c_str(), nullptr); r->path = dir + L"\\LibraBrowser-Setup-" + FromUtf8(u.ver) + L".exe"; if (!WriteAllRaw(r->path, body, false)) r->err = "the installer could not be saved on this PC"; }
         PostMessage(hw, WM_APP + 42, 0, (LPARAM)r.release()); }).detach();
 }
 void BrowserWindow::UpReady(void* p) {

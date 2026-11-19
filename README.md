@@ -14,6 +14,7 @@ No account. No sync. No telemetry in Libra Browser's own code. Built by <b>Psyli
 ## Why Libra Browser
 - **Blocks ads and trackers at the DNS layer.** Every site name is looked up through our own DNS-over-HTTPS server, so trackers are refused *before* a connection exists. Less data, less CPU, faster pages.
 - **Three levels per site:** Off, Balanced, Max, one tap from the shield icon. Fix a broken site without turning protection off everywhere.
+- **Install websites as desktop apps.** Libra Browser can detect eligible HTTPS web apps, ask for your confirmation, then create a dedicated Libra app window with Start-menu and optional Desktop shortcuts. App data stays in your local Libra profile, and links outside the app's site open in the normal browser.
 - **Built for old and small PCs.** One small `.exe` on top of the Edge WebView2 runtime that Windows already uses, tab sleeping, a low-end mode, and a first-run animation that skips itself on weak machines.
 - **Private by design.** No account, no cloud sync, no analytics, no tracking. Your history, bookmarks and passwords never leave the PC. The public 3.9.8 build does not show sponsored content; the signed-feed code is disabled until a publisher-controlled endpoint and public keys are verified.
 - **Security defaults that matter:** popups need a real click, downloads started by a page without a click are refused, permissions default to *ask*, motion sensors are always blocked, https upgrade, fingerprint protection, Mark-of-the-Web on downloads.
@@ -48,8 +49,14 @@ No account. No sync. No telemetry in Libra Browser's own code. Built by <b>Psyli
 ## New in Libra Browser 3.9.8 beta
 
 - **Sidebar sites:** keep up to 24 favourite sites in a local sidebar and open one in a docked panel without leaving the current tab. Favicons are fetched without cookies and cached locally.
-- **Install sites as apps:** install eligible HTTPS web apps after an explicit confirmation. App records are encrypted locally; shortcuts launch Libra with a validated app ID; app windows keep navigation within the app site and send outside links back to the normal browser.
+- **Install sites as apps:** install eligible HTTPS web apps after an explicit confirmation. Libra reads the site's web-app manifest, downloads a capped icon without cookies, creates a dedicated Libra window, and offers a Start-menu shortcut plus an optional Desktop shortcut. App records are encrypted locally; app windows keep navigation within the app site and send outside links back to the normal browser.
 - **App privacy controls:** remove installed apps from Settings, delete their shortcuts, and keep sign-in data in the browser profile.
+
+### Web-app installation
+
+When Libra detects an installable HTTPS web app, an install icon appears in the toolbar or sidebar. Choose **Install**, review the site's name and address, and optionally select **Add a shortcut on the Desktop**. Libra creates a separate app window that uses the same local browser profile, so existing sign-ins can continue to work without creating a new account. The app's stored record is protected with Windows DPAPI, and removing the app deletes its Libra-created shortcuts and local app record while leaving the site's normal browser data in place.
+
+App windows are deliberately scoped: navigation belonging to the installed site's domain remains in the app window; links to unrelated sites are sent to a regular Libra Browser window. Installation is unavailable in private windows, Child Safety mode, and other restricted browser states.
 
 ## Features
 **Protection**

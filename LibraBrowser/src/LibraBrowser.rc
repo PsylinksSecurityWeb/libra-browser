@@ -12,8 +12,8 @@ END
 
 // Version information
 1 VERSIONINFO
-FILEVERSION    3,9,4,0
-PRODUCTVERSION 3,9,4,0
+FILEVERSION    3,9,8,0
+PRODUCTVERSION 3,9,8,0
 FILEFLAGSMASK  0x3fL
 FILEFLAGS      0x0L
 FILEOS         0x40004L
@@ -27,11 +27,11 @@ BEGIN
             VALUE "CompanyName",      "Psylinks Security Private Limited"
             VALUE "LegalCopyright",   "Built by Psylinks Security Private Limited"
             VALUE "FileDescription",  "Libra Browser - Lightweight Windows Browser"
-            VALUE "FileVersion",      "3.9.4.0"
+            VALUE "FileVersion",      "3.9.8.0"
             VALUE "InternalName",     "LibraBrowser"
             VALUE "OriginalFilename", "LibraBrowser.exe"
             VALUE "ProductName",      "Libra Browser"
-            VALUE "ProductVersion",   "3.9.4.0"
+            VALUE "ProductVersion",   "3.9.8.0"
         END
     END
     BLOCK "VarFileInfo"

@@ -93,7 +93,7 @@ static void RoundRect(G::GraphicsPath& p, float x, float y, float w, float h, fl
 
 // ---- sizes and edge dock geometry ----
 static void CardSize(int& w, int& h) { float k = K(); w = (int)((g.card ? 236 : 168) * k); h = (int)((g.card ? 158 : 60) * k); }
-static int Strip() { return (std::max)(5, (int)(7 * K())); }
+static int Strip() { return (std::max)(10, (int)(14 * K())); }
 static void FullSize(int& w, int& h) { CardSize(w, h); if (g.side == Left || g.side == Right) w += Strip(); else if (g.side == Top || g.side == Bottom) h += Strip(); }
 static RECT WorkAt(POINT p) { MONITORINFO mi{ sizeof mi }; GetMonitorInfoW(MonitorFromPoint(p, MONITOR_DEFAULTTONEAREST), &mi); return mi.rcWork; }
 static float Ease(float t) { return t * t * (3 - 2 * t); }

@@ -158,10 +158,10 @@ main h2{scroll-margin-top:62px;margin:30px 0 10px 4px}
 details.info{border-top:1px solid #f0f0f0}details.info summary{list-style:none;cursor:pointer;display:flex;justify-content:space-between;align-items:center;padding:15px 0;font-size:15px;font-weight:500}
 details.info summary::-webkit-details-marker{display:none}details.info summary::after{content:'';width:7px;height:7px;border-right:2px solid #aaa;border-bottom:2px solid #aaa;transform:rotate(45deg);margin-right:4px;transition:transform .2s}details.info[open] summary::after{transform:rotate(-135deg)}
 details.info .body{padding:0 0 16px;color:#777;font-size:13px;line-height:1.6;max-width:640px}
-.sub+.row{border-top:0!important}.chips a.on{background:#111;color:#fff}
+.sub+.row{border-top:0!important}.chips a.on{background:#111;color:#fff}#ssr{flex:1 0 100%;box-sizing:border-box;height:44px;padding:0 16px 0 44px;border-radius:12px;border:1px solid #e5e5e5;background:#f6f6f6 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' fill='none' stroke='%23888' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='8' cy='8' r='6'/%3E%3Cpath d='M13 13l4 4'/%3E%3C/svg%3E") no-repeat 15px center;font-size:15px;outline:none}#ssr:focus{background-color:#fff;border-color:#111}.chips.srch a{display:none}#sno{color:#777;text-align:center;padding:40px 0;font-size:15px}
 .foot{padding:14px 0 16px!important;margin:0!important;border-top:1px solid #f0f0f0}
 </style>)H";
-inline std::wstring SettingsPage(const Settings& s, bool grey, const std::wstring& cloud = L"On", long long blocked = 0) {
+inline std::wstring SettingsPage(const Settings& s, bool grey, const std::wstring& cloud = L"On", long long blocked = 0, const std::wstring& apps = L"") {
     std::wstring eng = s.Get(L"engine", L"Google"), st = s.Get(L"startup", L"home");
     bool cs = s.Get(L"child_safe", L"0") == L"1";
     auto row = [](const std::wstring& lbl, const std::wstring& sub, const std::wstring& ctl) { return L"<div class=row><div><span class=lbl>" + lbl + L"</span>" + (sub.empty() ? std::wstring() : L"<small>" + sub + L"</small>") + L"</div>" + ctl + L"</div>"; };
@@ -172,14 +172,16 @@ inline std::wstring SettingsPage(const Settings& s, bool grey, const std::wstrin
     auto info = [](const wchar_t* title, const wchar_t* body) { return std::wstring(L"<details class=info><summary>") + title + L"</summary><div class=body>" + body + L"</div></details>"; };
     auto opt = [](const wchar_t* v, const wchar_t* label, const std::wstring& cur) { return std::wstring(L"<option value=") + v + (cur == v ? L" selected" : L"") + L">" + label + L"</option>"; };
     std::wstring b = std::wstring(kSetCss) + LR"H(<h1>Settings</h1><p class=bnote>Beta: small errors can happen. We improve Libra every day.</p>
-<div class=chips><a data-go=s-search>Search</a><a data-go=s-start>Startup</a><a data-go=s-dl>Downloads</a><a data-go=s-priv>Privacy</a><a data-go=s-perf>Performance</a><a data-go=s-ai>Assistant</a><a data-go=s-fam>Family</a><a data-go=s-about>About</a></div>)H";
+<div class=chips><input id=ssr type=search placeholder="Search all settings  ( / )" autocomplete=off><a data-go=s-search>Search</a><a data-go=s-start>Startup</a><a data-go=s-dl>Downloads</a><a data-go=s-priv>Privacy</a><a data-go=s-perf>Performance</a><a data-go=s-ai>Assistant</a><a data-go=s-fam>Family</a><a data-go=s-about>About</a></div>)H";
     // Search
     std::wstring e = L"<select data-k=engine>"; for (auto& k : kEngines) if (!k.ai) e += opt(k.name, k.name, eng); e += L"<optgroup label=\"AI search\">"; for (auto& k : kEngines) if (k.ai) e += opt(k.name, k.name, eng); e += L"</optgroup>" + opt(L"Custom", L"Custom...", eng) + L"</select>";
     b += sec(L"s-search", L"Search", row(LogoHtml(eng == L"Custom" ? L"Custom" : eng) + L"Search engine", L"Used by the address bar and the new tab page", e)
         + row(L"Custom search URL", L"Starts with https:// and ends where the search words go", txt(L"engine_url", L"https://example.com/search?q=")));
     // Startup
     b += sec(L"s-start", L"Startup", row(L"When Libra opens", L"", L"<select data-k=startup>" + opt(L"home", L"New tab page", st) + opt(L"last", L"Continue where I left off", st) + opt(L"url", L"A specific page", st) + L"</select>")
-        + row(L"Home page", L"Used with \"A specific page\"", txt(L"homepage", L"https://")));
+        + row(L"Home page", L"Used with \"A specific page\"", txt(L"homepage", L"https://"))
+        + Toggle(s, L"site_dock", L"Sidebar sites", L"A slim bar on the right with your favourite sites (Gmail, WhatsApp...). Click one to open it beside the page")
+        + row(L"Sidebar site list", L"Addresses separated by commas. The + under the icons adds the page you are on; right-click an icon to remove it", L"<input type=text data-k=site_list value=\"" + Esc(s.Get(L"site_list", L"https://mail.google.com, https://web.whatsapp.com")) + L"\">"));
     // Downloads
     b += sec(L"s-dl", L"Downloads", row(L"Save to", L"Empty means your Downloads folder", txt(L"dl_dir", L"Downloads folder")) + L"<div class=row><div><span class=lbl>Ask where to save</span><small>Libra always asks. Nothing is downloaded until you press Save.</small></div><span style=\"color:#8a8a8a;font-size:13px;width:236px;text-align:right\">Always on</span></div>"
         + Toggle(s, L"save_video", L"Save videos", L"A quiet icon in the address bar when a page has a video"));
@@ -228,14 +230,15 @@ inline std::wstring SettingsPage(const Settings& s, bool grey, const std::wstrin
             L"<b>Honest limits.</b> An AI can make mistakes, and websites may try to trick it with hidden text. It treats page text as data, not orders. Check the review card before you submit anything important.")
         + L"<p class=foot style=\"padding-top:4px\">Beta: the Assistant can make mistakes. Check its work.</p>");
     // Family
+    if (!apps.empty()) { b += sec(L"s-apps", L"Apps", apps); size_t cp = b.find(L"<a data-go=s-fam>"); if (cp != std::wstring::npos) b.insert(cp, L"<a data-go=s-apps>Apps</a>"); }
     b += sec(L"s-fam", L"Family", row(L"Child Safety mode", std::wstring(cs ? L"On. Adult, malware and scam sites are blocked. Turning it off needs your Windows password" : L"Blocks adult, malware and scam sites. Needs your Windows password")
         + (s.Get(L"child_nolock", L"0") == L"1" ? L" Your Windows account has no password, so anyone can turn this off." : L""), std::wstring(L"<button data-c=family.toggle>") + (cs ? L"Turn off" : L"Turn on") + L"</button>"));
     // About
-    b += sec(L"s-about", L"About", row(L"Libra Browser", L"Version 3.9.4 (beta). Secure, private and lightweight. Built by Psylinks Security Private Limited", L"")
+    b += sec(L"s-about", L"About", row(L"Libra Browser", L"Version 3.9.8 (beta). Secure, private and lightweight. Built by Psylinks Security Private Limited", L"")
         + info(L"What Libra does", L"Blocks ads and trackers before they load. Upgrades sites to secure https. Blocks popups and downloads you did not ask for. Hides your browser fingerprint. Keeps a password vault and generator. Fast multi-connection downloads. Private windows that leave nothing behind. Light on memory and CPU. We collect nothing about you. The new-tab page shows clearly labelled sponsored items that support Libra. Anonymous counts can be switched off on the Privacy page.")
-        + info(L"License", L"Open source under Apache-2.0. Preserve the LICENSE, NOTICE, and required attribution information.")
+        + info(L"License", L"Source available: you can read the code. You may not change, share or sell it without written permission from Psylinks Security Private Limited. See the LICENSE file.")
         + row(L"Source code", L"<a href=\"https://github.com/PsylinksSecurityWeb/libra-browser\" style=\"color:inherit\">github.com/PsylinksSecurityWeb/libra-browser</a>", L""));
-    return PageShell(L"Settings", b, grey, LR"JS(document.querySelectorAll('.chips a').forEach(a=>a.onclick=()=>{const t=document.getElementById(a.dataset.go);if(t)t.scrollIntoView({behavior:'smooth',block:'start'})});const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting)document.querySelectorAll('.chips a').forEach(a=>a.classList.toggle('on',a.dataset.go===e.target.id))}),{rootMargin:'-70px 0px -70% 0px'});document.querySelectorAll('main h2[id]').forEach(h=>io.observe(h));)JS", L"settings");
+    return PageShell(L"Settings", b, grey, LR"JS(document.querySelectorAll('.chips a').forEach(a=>a.onclick=()=>{const t=document.getElementById(a.dataset.go);if(t)t.scrollIntoView({behavior:'smooth',block:'start'})});const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting)document.querySelectorAll('.chips a').forEach(a=>a.classList.toggle('on',a.dataset.go===e.target.id))}),{rootMargin:'-70px 0px -70% 0px'});document.querySelectorAll('main h2[id]').forEach(h=>io.observe(h));const q=document.getElementById('ssr'),em=document.createElement('p');em.id='sno';em.style.display='none';em.textContent='No settings match your search.';document.querySelector('main').appendChild(em);function fl(){const v=q.value.trim().toLowerCase(),cs=[...document.querySelectorAll('main .card')];document.querySelector('.chips').classList.toggle('srch',!!v);cs.forEach(c=>{let n=0;[...c.children].forEach(x=>{let m=!v;if(v){if(x.classList.contains('sub'))m=false;else{m=x.textContent.toLowerCase().includes(v);if(x.tagName==='DETAILS')x.open=m}}x.style.display=m?'':'none';if(m&&!x.classList.contains('sub'))n++});const sh=n||!v;c.style.display=sh?'':'none';const h=c.previousElementSibling;if(h&&h.tagName==='H2')h.style.display=sh?'':'none'});em.style.display=v&&!cs.some(c=>c.style.display!=='none')?'':'none'}q.oninput=fl;q.onkeydown=e=>{if(e.key==='Escape'){q.value='';fl()}};document.addEventListener('keydown',e=>{const t=document.activeElement.tagName;if(e.key==='/'&&t!=='INPUT'&&t!=='TEXTAREA'&&t!=='SELECT'){e.preventDefault();q.focus()}});)JS", L"settings");
 }
 
 // libra://appearance : colour mode (more look-and-feel options will live here)

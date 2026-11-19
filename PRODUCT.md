@@ -1,6 +1,6 @@
 # Libra Browser: product description
 
-**Version 3.9.4 (beta) · Windows 10 and 11 · Free to use · Made by Psylinks Security Private Limited, India**
+**Version 3.9.8 (beta) · Windows 10 and 11 · Free to use · Made by Psylinks Security Private Limited, India**
 
 ---
 
@@ -188,7 +188,7 @@ Libra Browser is a free 3 MB Windows browser: ads and trackers blocked in the cl
 Libra Browser: Private and Light
 
 **Press line**
-Psylinks Security Private Limited, an Indian security company, has released Libra Browser 3.9.4 (beta), a free Windows browser that blocks ads and trackers in the cloud, collects no user data, and includes a Child Safety mode locked by the Windows password.
+Psylinks Security Private Limited, an Indian security company, has released Libra Browser 3.8 (beta), a free Windows browser that blocks ads and trackers in the cloud, collects no user data, and includes a Child Safety mode locked by the Windows password.
 
 **Three headline benefits**
 1. Cleaner, faster pages: ads and trackers are blocked before they load.

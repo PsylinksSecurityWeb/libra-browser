@@ -61,9 +61,17 @@ static void WipeData() {   // a fresh install starts clean: no history, tiles, p
 }
 static void Progress(int pct, const wchar_t* text) { PostMessageW(g_wnd, WM_PROG, pct, (LPARAM)_wcsdup(text)); Sleep(130); }   // small pause so each step is readable
 
+static bool StopMeter() {   // the Libra Meter is its own LibraBrowser.exe process and keeps the exe locked
+    HWND w = FindWindowW(L"LibraMeterWnd", nullptr); if (!w) return false;
+    DWORD pid = 0; GetWindowThreadProcessId(w, &pid); HANDLE p = OpenProcess(SYNCHRONIZE | PROCESS_TERMINATE, FALSE, pid);
+    PostMessageW(w, WM_CLOSE, 0, 0);
+    if (p) { if (WaitForSingleObject(p, 4000) != WAIT_OBJECT_0) { TerminateProcess(p, 0); WaitForSingleObject(p, 2000); } CloseHandle(p); }
+    return true;
+}
 static DWORD WINAPI Worker(LPVOID) {
     CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
     Progress(2, L"Preparing...");
+    const bool hadMeter = StopMeter();   // only the Libra Meter is running: stop it, install, start it again
     bool fresh; { HKEY k0; fresh = RegOpenKeyExW(HKEY_CURRENT_USER, kUninstKey, 0, KEY_READ, &k0) != ERROR_SUCCESS; if (!fresh) RegCloseKey(k0); }
     HRSRC r = FindResourceW(nullptr, MAKEINTRESOURCEW(IDR_PAYLOAD), RT_RCDATA);
     const BYTE* data = (const BYTE*)LockResource(LoadResource(nullptr, r)); DWORD size = SizeofResource(nullptr, r);
@@ -86,10 +94,12 @@ static DWORD WINAPI Worker(LPVOID) {
     Progress(75, L"Creating shortcuts...");
     MakeLink(SpecialDir(CSIDL_DESKTOPDIRECTORY) + L"\\" + kName + L".lnk", exe);
     std::wstring sm = SpecialDir(CSIDL_PROGRAMS); MakeLink(sm + L"\\" + kName + L".lnk", exe);
+    if (hadMeter) { STARTUPINFOW ms{ sizeof(ms) }; PROCESS_INFORMATION mp{}; std::wstring mc = L"\"" + exe + L"\" --meter";
+        if (CreateProcessW(nullptr, &mc[0], nullptr, nullptr, FALSE, 0, nullptr, g_dir.c_str(), &ms, &mp)) { CloseHandle(mp.hThread); CloseHandle(mp.hProcess); } }
     Progress(88, L"Registering Libra Browser...");
     HKEY k;
     if (RegCreateKeyExW(HKEY_CURRENT_USER, kUninstKey, 0, nullptr, 0, KEY_WRITE, nullptr, &k, nullptr) == ERROR_SUCCESS) {
-        RegStr(k, L"DisplayName", kName); RegStr(k, L"DisplayVersion", L"3.9.4"); RegStr(k, L"Publisher", kCompany);
+        RegStr(k, L"DisplayName", kName); RegStr(k, L"Publisher", kCompany);
         RegStr(k, L"InstallLocation", g_dir); RegStr(k, L"DisplayIcon", exe);
         RegStr(k, L"UninstallString", L"\"" + g_dir + L"\\Uninstall.exe\" /uninstall");
         RegStr(k, L"URLInfoAbout", L"https://github.com/PsylinksSecurityWeb/libra-browser");
@@ -111,7 +121,7 @@ static LRESULT CALLBACK Proc(HWND h, UINT m, WPARAM w, LPARAM l) {
         g_fSmall = CreateFontW(-12, 0, 0, 0, FW_NORMAL, 0, 0, 0, DEFAULT_CHARSET, 0, 0, CLEARTYPE_QUALITY, 0, L"Segoe UI");
         auto mk = [&](const wchar_t* cls, const wchar_t* txt, DWORD st, int x, int y, int cw, int ch, HFONT f) { HWND c = CreateWindowExW(0, cls, txt, WS_CHILD | WS_VISIBLE | st, x, y, cw, ch, h, nullptr, nullptr, nullptr); SendMessageW(c, WM_SETFONT, (WPARAM)f, TRUE); return c; };
         mk(L"STATIC", kName, 0, 40, 36, 440, 48, g_fTitle);
-        mk(L"STATIC", L"Secure, private and lightweight. Version 3.9.4", 0, 42, 86, 440, 22, g_fText);
+        mk(L"STATIC", L"Secure, private and lightweight.", 0, 42, 86, 440, 22, g_fText);
         g_status = mk(L"STATIC", L"Starting...", 0, 42, 150, 440, 22, g_fText);
         g_bar = CreateWindowExW(0, PROGRESS_CLASSW, L"", WS_CHILD | WS_VISIBLE | PBS_SMOOTH, 42, 182, 436, 8, h, nullptr, nullptr, nullptr);
         SetWindowTheme(g_bar, L"", L""); SendMessageW(g_bar, PBM_SETBARCOLOR, 0, RGB(17, 17, 17)); SendMessageW(g_bar, PBM_SETBKCOLOR, 0, RGB(232, 232, 232));

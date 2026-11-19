@@ -30,6 +30,9 @@ public:
 
     bool Create(int nCmdShow);
     void OpenTab(const std::wstring& url = L"", bool incognito = false, bool background = false);
+    void SetApp(const std::wstring& id, const std::wstring& name, const std::wstring& url, int port) { m_app = true; m_appId = id; m_appName = name; m_appUrl = url; m_appPort = port; }   // web-app window (Apps.h)
+    void SetHostHidden() { m_hostHidden = true; }   // engine host for an app window while the browser is not open: no window shown
+    int TabHpx() const; void AppMinimized(bool min);
     void CloseTab(int index);
     void SwitchTab(int index);
     void NavigateTo(const std::wstring& input);    // Smart URL/search
@@ -168,6 +171,10 @@ private:
     void PrivClear(Tab* t, const std::set<std::wstring>& keys, const std::wstring& range);
     void OnPrivPage(int idx, const std::vector<std::wstring>& v);
     void OnAgentPage(int idx, const std::vector<std::wstring>& v); void AgentOnLlm(unsigned gen, const std::wstring& text); void AgSend(const std::wstring& js); void AgStop(const wchar_t* why); int AgTarget() const; void AgRunAct(int ti, const std::wstring& op, const std::wstring& id, const std::wstring& tx, bool ok);
+    bool AppOffer() const; std::wstring AppOfferName() const; RECT AppRect() const; void AppRelayout(); void AppDetectSoon(); void AppDetectRun(); void AppInstallAsk(bool manual = false); void AppLaunch(const std::wstring& id); void AppWindowProps(); bool AppInScope(const std::wstring& u) const; void AppToBrowser(const std::wstring& u); void AppRemove(const std::wstring& id); std::wstring AppsHtml(); bool m_appDesk = false; void PaintAppIcon(HDC hdc); void AppInstalled(void* p); void AppLoadInstalled(); std::set<std::wstring> m_appInst; bool m_appInstLoaded = false, m_appInstalling = false; std::map<std::wstring, std::wstring> m_appCache; bool m_appBusy = false, m_appShown = false;
+    bool SiteOn() const; int SiteW() const; std::vector<std::wstring> SiteList() const; RECT SiteRect(int i) const; void PaintSites(HDC hdc); bool SiteClick(int x, int y); void OpenSite(const std::wstring& u); void ApplySite(); Tab* m_sitePanel = nullptr; std::wstring m_siteUrl; std::map<std::wstring, std::shared_ptr<void>> m_siteFav; std::set<std::wstring> m_siteTry; void SiteIconGot(void* p); void SiteSaveIcon(const std::string& bytes, const std::shared_ptr<void>& bm);
+    bool TabHid(int i) const; int LastVisTab() const; bool SiteRight(int x, int y); void SiteAdd(const std::wstring& url); void SiteSetList(const std::vector<std::wstring>& v); void SwitchEngineTabs(const std::wstring& oldEu);
+    bool DockOn() const { return m_agDock || m_sitePanel; }
     void ToggleAgent(); void ApplyDock(); bool AgAllowedHere() const; int AgDockIdx() const; bool m_agDock = false;
     void AgFileHook(bool on); void AgFileChosen(void* p); void AgGoNow(); bool m_agPaused = false; bool AgAsk(const std::wstring& cat, const std::wstring& dom, const std::wstring& title, const std::wstring& detail, bool once); void AgClickCheck(); std::wstring m_agClickId, m_agFp; int m_agRetried = 0; std::wstring m_agAttach; std::wstring m_agTaskRaw; std::set<std::wstring> m_agTypeOk; int m_agFcN = 0; void VoiceCmd(const std::wstring& a, const std::wstring& b); void OnVoiceMsg(void* p); bool m_agConv = false; Tab* m_agHome = nullptr; Tab* m_agRes = nullptr; int m_agTabs = 0; void AgKeyChecked(const std::wstring& r); void AgClickNow(); int m_agClickX = 0, m_agClickY = 0; Tab* m_agClickTab = nullptr; int m_agTry = 0, m_agClickRid = 0; wil::com_ptr<ICoreWebView2Frame2> m_agClickFrame; void AgNextStrategy(); void AgExecT(const wchar_t* js, ICoreWebView2ExecuteScriptCompletedHandler* h); EventRegistrationToken m_agFcTok{}; Tab* m_agFcTab = nullptr; Tab* m_agGoTab = nullptr; std::wstring m_agTaskKey, m_agGoUrl;
     bool m_agRun = false; unsigned m_agGen = 0; int m_agSteps = 0; DWORD m_agStart = 0; Tab* m_agTarget = nullptr; std::wstring m_agScope;   // Agent.inl
@@ -212,6 +219,7 @@ private:
     bool m_settingText = false;
     bool m_full = false;
     DWORD m_typedTick = 0;   // last time the user typed an address (app-started navigations count as user actions)
+    bool m_app = false, m_hostHidden = false; std::wstring m_appId, m_appName, m_appUrl; int m_appPort = 0;
     bool m_setup = false;   // first-run: page only, no tab strip / address bar
     bool m_lowEnd = false;   // light mode for older PCs
     WINDOWPLACEMENT m_wp{};

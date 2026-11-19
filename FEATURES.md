@@ -28,7 +28,7 @@ Many free browsers pay for themselves with your data. Libra Browser doesn't. It 
 
 ---
 
-## New in this version (3.9.4, beta)
+## New in this version (3.9.8, beta)
 
 - **AI Assistant (beta, optional).** Bring your own API key. It can fill forms and read pages for you, asks before anything risky, never types passwords or card numbers, and never solves CAPTCHAs. **When the assistant is closed, the AI sees nothing**: nothing is read for it and nothing is sent.
 - **Auto suggest (optional, no AI, this PC only).** Click an empty name, e-mail, phone or company box and Libra Browser offers the matching value from your own saved notes in its own popup. It opens only after a real click or Tab key and never for passwords, user names, cards or ID numbers.
@@ -210,14 +210,19 @@ The very first time you open Libra Browser, you see only a short film, then a fe
 Built by Psylinks Security Private Limited, India.
 Source: https://github.com/PsylinksSecurityWeb/libra-browser
 
-## 3.9.4 meter, colour mode, offline game, faster screenshots
+## 3.9.6 sidebar sites, settings search
+- **Sidebar sites (Settings > Startup):** a slim bar with your favourite sites (Gmail, WhatsApp Web...). Click one to open it beside the page, with its real logo. The + adds the page you are on, right-click removes a site or hides the bar. It never adds a tab.
+- **Settings search:** one box on top searches every setting (press / to focus).
+- **Internal pages** get a dark tab with their own symbol; changing the search engine updates every open tab; the Libra Meter starts again after an update; Setup closes and restarts only the meter instead of asking you to close the browser, and no longer shows a version.
+
+## 3.9.8 meter, colour mode, offline game, faster screenshots
 - **Libra Meter:** a tiny always-on PC load meter (CPU as Task Manager shows it, plus disk and memory pressure). Runs without the browser (`LibraBrowser.exe --meter`), tucks into a screen edge as a colour strip and slides out when the mouse touches it. Off by default; reads Windows counters only, sends nothing.
 - **Colour mode and Appearance page:** pick any colour and the toolbar, tabs, address bar, icons and pages follow it.
 - **Libra Pop:** a small bubble-shooter game on the error page when the PC is really offline.
 - **Privacy:** optional Block Microsoft Recall, history retention (keep forever ... do not keep), notifications always refused (no web push), periodic background sync off.
 - **Faster full-page screenshot** (one capture call), a visible cancel button, and Open link in new tab opens in the background.
 
-## 3.9.2 reading, PDFs and a calmer first run
+## 3.9.8 reading, PDFs and a calmer first run
 - **Reader mode (F9):** a clean, text-only view of an article. Pictures and scripts of the site never load in it, and it opens only from F9 on a web page.
 - **PDFs:** downloaded PDFs open in the browser's own PDF viewer in a new tab. "Sign a PDF" (Ctrl+Shift+F) fills in and signs a PDF on this PC and saves a signed copy; the original is never changed. Its two open-source tools (pdf.js, pdf-lib) are downloaded once, on request, and checked against a fixed checksum.
 - **Bookmarks:** import from Chrome, Edge, Brave, Firefox or a file; encrypted backup and restore of bookmarks and a few safe settings (never passwords, history or the Assistant key).
@@ -234,3 +239,6 @@ Source: https://github.com/PsylinksSecurityWeb/libra-browser
 - Fewer readable device details: empty Client Hints, fixed audio latency, heap limit, CPU cores, screen availability, keyboard layout; hides contrast / reduced-motion / transparency preferences (switch in Settings); canvas font probing limited to common fonts (Max level); optional "Hide my time zone".
 - window.name is cleared when you move to another site.
 - Optional "Clear cookies, site data and cache at startup" with a "Stay signed in on" list (partitioned third-party cookies included).
+
+## 3.9.8 web apps
+Install a website as an app: Libra Browser checks by itself, with the engine's own installability test, whether a site is an installable web app (YouTube, WhatsApp Web, Spotify and many more). An install icon appears (address bar, or the sidebar strip). One Windows sheet asks first; then the site's own icon is downloaded once and the app opens in its own window with no tabs and no address bar. It shares the browser's engine and sign-in, so it costs about the same memory as one tab, and a minimised app falls asleep. Start menu shortcut (Desktop optional), Settings > Apps (Open / Remove), manual "Install this site as an app" in the menu, and "Pin to taskbar" starts that app. Other sites open in the browser. No background activity: no notifications, no auto start. Also: Brave logo, Yahoo search, a thicker Libra Meter edge strip.

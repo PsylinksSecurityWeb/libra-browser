@@ -16,6 +16,8 @@ using std::max;
 #include "Downloader.h"
 #include "WebView2EnvironmentOptions.h"
 #include "BrowserWindow.h"
+#include "Apps.h"
+static bool AppHostOk(const std::wstring& url);
 static bool CanUpgradeToHttps(const std::wstring& url);   // Fp.inl
 static std::wstring StripTrackers(const std::wstring& url);   // Fp.inl
 static int StatDay(int back);
@@ -95,9 +97,9 @@ static void PrivWipeSessionAtStart(bool keepCookies);   // Privacy.inl
 struct MenuIt { const wchar_t* n; const wchar_t* g; const wchar_t* u; };
 #include <filesystem>
 #include "FlameIcon.h"
-static const MenuIt kMenuIts[11] = { { L"History", L"\xE81C", L"libra://history" }, { L"Downloads", L"\xE896", L"libra://downloads" }, { L"Bookmarks", L"\xE734", L"libra://bookmarks" },
+static const MenuIt kMenuIts[12] = { { L"History", L"\xE81C", L"libra://history" }, { L"Downloads", L"\xE896", L"libra://downloads" }, { L"Bookmarks", L"\xE734", L"libra://bookmarks" },
     { L"Passwords", L"\xE72E", L"libra://passwords" }, { L"Privacy", L"\xE7B3", L"libra://privacy" }, { L"Tabs", L"\xE7C4", L"libra://tabs" }, { L"Settings", L"\xE713", L"libra://settings" },
-    { L"New private window", L"\xE7B3", L"libra://private" }, { L"Burn", L"", L"libra://burn" }, { L"Screenshot", L"ç22", L"libra://shot" }, { L"New window", L"\xE8A7", L"libra://newwin" } };
+    { L"New private window", L"\xE7B3", L"libra://private" }, { L"Burn", L"", L"libra://burn" }, { L"Screenshot", L"ç22", L"libra://shot" }, { L"New window", L"\xE8A7", L"libra://newwin" }, { L"Install this site as an app", L"\xE71D", L"libra://appinst" } };
 // Segoe Fluent Icons (Win11) with Segoe MDL2 Assets fallback (Win10).
 static HFONT MakeIconFont(int px) {
     HFONT f = CreateFontW(-px, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET,
@@ -273,7 +275,7 @@ void BrowserWindow::RegisterClass() {
     wc.hInstance     = m_hInst;
     wc.hCursor       = LoadCursor(nullptr, IDC_ARROW);
     wc.hbrBackground = CreateSolidBrush(Color::ToolbarBg);
-    wc.lpszClassName = m_incognito ? L"LibraBrowserWndP" : L"LibraBrowserWnd";   // private windows never receive links meant for the normal window
+    wc.lpszClassName = m_app ? L"LibraBrowserApp" : m_incognito ? L"LibraBrowserWndP" : L"LibraBrowserWnd";   // private windows never receive links meant for the normal window
     wc.hIcon         = LoadIcon(m_hInst, MAKEINTRESOURCE(IDI_LIBRA));
     wc.hIconSm       = LoadIcon(m_hInst, MAKEINTRESOURCE(IDI_LIBRA));
     RegisterClassExW(&wc);
@@ -300,14 +302,20 @@ bool BrowserWindow::Create(int nCmdShow) {
 
     m_hWnd = CreateWindowExW(
         WS_EX_APPWINDOW,
-        m_incognito ? L"LibraBrowserWndP" : L"LibraBrowserWnd",
-        m_incognito ? L"Libra - Incognito" : L"Libra Browser",
+        m_app ? L"LibraBrowserApp" : m_incognito ? L"LibraBrowserWndP" : L"LibraBrowserWnd",
+        m_app ? m_appName.c_str() : m_incognito ? L"Libra - Incognito" : L"Libra Browser",
         WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN,
         x, y, w, h,
         nullptr, nullptr, m_hInst, this
     );
     if (!m_hWnd) return false;
 
+    if (m_app) {   // the site's own icon (made at install) for the window and the taskbar
+        std::wstring ip = DataDir() + L"\\apps\\" + m_appId + L".ico";
+        HICON big = (HICON)LoadImageW(nullptr, ip.c_str(), IMAGE_ICON, GetSystemMetrics(SM_CXICON), GetSystemMetrics(SM_CYICON), LR_LOADFROMFILE), sm = (HICON)LoadImageW(nullptr, ip.c_str(), IMAGE_ICON, GetSystemMetrics(SM_CXSMICON), GetSystemMetrics(SM_CYSMICON), LR_LOADFROMFILE);
+        if (big) SendMessageW(m_hWnd, WM_SETICON, ICON_BIG, (LPARAM)big); if (sm) SendMessageW(m_hWnd, WM_SETICON, ICON_SMALL, (LPARAM)sm);
+    }
+    AppWindowProps();
     // Enable DWM rounded corner on Win11
     DWM_WINDOW_CORNER_PREFERENCE pref = DWMWCP_ROUND;
     DwmSetWindowAttribute(m_hWnd, DWMWA_WINDOW_CORNER_PREFERENCE, &pref, sizeof(pref));
@@ -325,17 +333,19 @@ bool BrowserWindow::Create(int nCmdShow) {
     SetWindowThemeAttribute(m_hWnd, WTA_NONCLIENT, &wta, sizeof(wta));
 
     CreateControls();
-    m_set.Load();   // first run: no toolbar or tab strip may ever flash before the intro animation
-    if (!m_incognito && !m_set.On(L"welcomed")) { m_setup = true; for (HWND w : { m_hOmnibox, m_hBtnBack, m_hBtnFwd, m_hBtnRefresh, m_hBtnShield, m_hBtnAgent, m_hBtnShot, m_hBtnMenu }) ShowWindow(w, SW_HIDE); }
-    ShowWindow(m_hWnd, nCmdShow);
+    m_set.Load(); if (!m_incognito && !m_app && m_set.On(L"meter_on") && !Mt::Find()) Mt::Launch();   // the meter was closed by an update or crash: bring it back
+    // first run: no toolbar or tab strip may ever flash before the intro animation
+    if (m_app) for (HWND w : { m_hOmnibox, m_hBtnFwd, m_hBtnShield, m_hBtnAgent, m_hBtnShot, m_hBtnMenu }) ShowWindow(w, SW_HIDE);   // app window: back, reload and the site name only
+    if (!m_incognito && !m_app && !m_set.On(L"welcomed")) { m_setup = true; for (HWND w : { m_hOmnibox, m_hBtnBack, m_hBtnFwd, m_hBtnRefresh, m_hBtnShield, m_hBtnAgent, m_hBtnShot, m_hBtnMenu }) ShowWindow(w, SW_HIDE); }
+    ShowWindow(m_hWnd, m_hostHidden ? SW_HIDE : nCmdShow);
     UpdateWindow(m_hWnd);
 
     // Create WebView2 environment (async – tab opens once env is ready)
     std::wstring userDataFolder = [this]() -> std::wstring {
         wchar_t path[MAX_PATH];
         GetEnvironmentVariableW(L"LOCALAPPDATA", path, MAX_PATH);
-        SweepStalePrivate(std::wstring(path) + L"\\LibraBrowser");   // every start, normal or private
-        if (!m_incognito) DeleteFileW((std::wstring(path) + L"\\LibraBrowser\\pdftools\\work.pdf").c_str());   // the working copy of a PDF the signer page never picked up
+        if (!m_app) SweepStalePrivate(std::wstring(path) + L"\\LibraBrowser");   // every start, normal or private
+        if (!m_incognito && !m_app) DeleteFileW((std::wstring(path) + L"\\LibraBrowser\\pdftools\\work.pdf").c_str());   // the working copy of a PDF the signer page never picked up
         if (m_incognito) {   // private window: its own throw-away profile + DNS cache in TEMP, removed when it closes (and swept at the next private start)
             std::wstring tmp = std::wstring(path) + L"\\LibraBrowser\\Private-" + std::to_wstring(GetCurrentProcessId()); std::error_code ec; std::filesystem::remove_all(tmp, ec);
             std::filesystem::create_directories(tmp, ec); m_privDir = tmp; return tmp + L"\\UserData";
@@ -357,8 +367,9 @@ bool BrowserWindow::Create(int nCmdShow) {
         for (char c : h) if (!isalnum((unsigned char)c) && c != '.' && c != '-') return;
         PostMessage(m_hWnd, WM_APP + 1, 0, (LPARAM) new std::string(h));
     };
-    int proxyPort = DohProxy::Get().Start(L"dns.psylinks-beta.com", L"/dns-query", (m_incognito && !m_privDir.empty() ? m_privDir : DataDir()) + L"\\dns.cache");
-    if (proxyPort) {   // warm the cache for sites you actually use
+    int proxyPort = m_app ? m_appPort : DohProxy::Get().Start(L"dns.psylinks-beta.com", L"/dns-query", (m_incognito && !m_privDir.empty() ? m_privDir : DataDir()) + L"\\dns.cache");
+    if (proxyPort && !m_app) { SetPropW(m_hWnd, L"lbport", (HANDLE)(INT_PTR)proxyPort); SetPropW(m_hWnd, L"lbdir", AppDirTag()); }   // an app window finds this browser by these
+    if (proxyPort && !m_app) {   // warm the cache for sites you actually use
         std::vector<std::string> warm; std::set<std::string> seen;
         {   // the search engine you chose, plus the hosts its result page always pulls in
             std::wstring eh = HostOf(EngineUrl()); std::string e8 = ToUtf8(eh);
@@ -393,8 +404,8 @@ bool BrowserWindow::Create(int nCmdShow) {
     }
     envOpts->put_AdditionalBrowserArguments(args.c_str());
 
-    if (!m_incognito && m_set.On(L"clear_start")) PrivWipeSessionAtStart(!m_set.Get(L"keep_signin", L"").empty());   // fresh start: cookies, site data, caches, Alt-Svc/HSTS/favicon state (engine not running yet)
-    PrivWipeCachesAtStart();   // caches the owner asked to clear (GPU, shader, code) are removed before the engine opens them
+    if (!m_incognito && !m_app && m_set.On(L"clear_start")) PrivWipeSessionAtStart(!m_set.Get(L"keep_signin", L"").empty());   // fresh start: cookies, site data, caches, Alt-Svc/HSTS/favicon state (engine not running yet)
+    if (!m_app) PrivWipeCachesAtStart();   // caches the owner asked to clear (GPU, shader, code) are removed before the engine opens them
     CreateCoreWebView2EnvironmentWithOptions(
         nullptr, userDataFolder.c_str(), envOpts.Get(),
         Microsoft::WRL::Callback<ICoreWebView2CreateCoreWebView2EnvironmentCompletedHandler>(
@@ -479,7 +490,7 @@ void BrowserWindow::CreateControls() {
 // Rounded address-bar pill, in client coordinates.
 RECT BrowserWindow::OmniPillRect() const {
     RECT cr; GetClientRect(m_hWnd, &cr);
-    int tabH  = MulDiv(Layout::TabBarHeight,   m_dpi, 96);
+    int tabH  = TabHpx();
     int toolH = MulDiv(Layout::ToolbarHeight,  m_dpi, 96);
     int btnSz = MulDiv(Layout::ButtonSize,     m_dpi, 96);
     int pad   = MulDiv(Layout::ToolbarPadding, m_dpi, 96);
@@ -492,7 +503,7 @@ RECT BrowserWindow::OmniPillRect() const {
 }
 
 void BrowserWindow::LayoutToolbar(int cx) {
-    int tabH  = MulDiv(Layout::TabBarHeight,   m_dpi, 96);
+    int tabH  = TabHpx();
     int toolH = MulDiv(Layout::ToolbarHeight,  m_dpi, 96);
     int btnSz = MulDiv(Layout::ButtonSize,     m_dpi, 96);
     int pad   = MulDiv(Layout::ToolbarPadding, m_dpi, 96);
@@ -500,7 +511,7 @@ void BrowserWindow::LayoutToolbar(int cx) {
     int btnY  = tabH + (toolH - btnSz) / 2;
     SetWindowPos(m_hBtnBack,    nullptr, pad,                    btnY, btnSz, btnSz, SWP_NOZORDER);
     SetWindowPos(m_hBtnFwd,     nullptr, pad + (btnSz + gap),    btnY, btnSz, btnSz, SWP_NOZORDER);
-    SetWindowPos(m_hBtnRefresh, nullptr, pad + (btnSz + gap) * 2, btnY, btnSz, btnSz, SWP_NOZORDER);
+    SetWindowPos(m_hBtnRefresh, nullptr, pad + (btnSz + gap) * (m_app ? 1 : 2), btnY, btnSz, btnSz, SWP_NOZORDER);
     SetWindowPos(m_hBtnMenu,    nullptr, cx - pad - btnSz,       btnY, btnSz, btnSz, SWP_NOZORDER);
     SetWindowPos(m_hBtnShield,  nullptr, cx - pad - btnSz * 2 - gap, btnY, btnSz, btnSz, SWP_NOZORDER);
     SetWindowPos(m_hBtnAgent,   nullptr, cx - pad - btnSz * 3 - gap * 2, btnY, btnSz, btnSz, SWP_NOZORDER);
@@ -510,7 +521,7 @@ void BrowserWindow::LayoutToolbar(int cx) {
     RECT pill = OmniPillRect();
     int editH = MulDiv(20, m_dpi, 96);
     int inL   = MulDiv(42, m_dpi, 96);   // room for the search glyph
-    int inR   = MulDiv(44 + (m_set.On(L"save_video") ? 30 : 0), m_dpi, 96);   // room for the star (and the quiet save-video icon)
+    int inR   = MulDiv(44 + (m_set.On(L"save_video") ? 30 : 0) + (AppOffer() && !SiteOn() ? 30 : 0), m_dpi, 96);   // room for the star (and the quiet save-video icon)
     SetWindowPos(m_hOmnibox, nullptr, pill.left + inL,
                  pill.top + ((pill.bottom - pill.top) - editH) / 2,
                  std::max(20, (int)(pill.right - pill.left - inL - inR)), editH, SWP_NOZORDER);
@@ -646,7 +657,7 @@ void BrowserWindow::InitWebView2(int tabIndex) {
                 // ─ Bounds ───────────────────────────────────────────────
                 ctrl->put_Bounds(wvRect);
                 ctrl->put_IsVisible(tabIndex == m_activeTab ? TRUE : FALSE);
-                if (m_agDock) PostMessage(m_hWnd, WM_APP + 32, 0, 0);   // agent sidebar: lay out once the view exists
+                if (DockOn()) PostMessage(m_hWnd, WM_APP + 32, 0, 0);   // agent sidebar: lay out once the view exists
 
                 if (!m_set.On(L"welcomed")) {   // first-run hero: files in the data folder, served from a virtual host (no network)
                     std::wstring hd = DataDir() + L"\\hero"; CreateDirectoryW(hd.c_str(), nullptr);
@@ -738,6 +749,7 @@ void BrowserWindow::InitWebView2(int tabIndex) {
                                 if (sch == L"file" && m_pdfAllow.count(lw)) sch = L"";   // a downloaded PDF the user chose to read: the engine's own PDF viewer shows it
                                 for (auto b : bad) if (sch == b) { args->put_Cancel(TRUE); t2->loading = false; return S_OK; }
                             }
+                            if (m_app && uri.get() && IsHttp(uri.get()) && !AppInScope(uri.get())) { args->put_Cancel(TRUE); t2->loading = false; AppToBrowser(uri.get()); return S_OK; }   // an app stays on its own site: other sites open in the browser
                             if (uri.get() && m_set.Get(L"https_upgrade", L"1") != L"0" && CanUpgradeToHttps(uri.get())) {   // http -> https first
                                 std::wstring host = HostOf(uri.get()); DWORD now = GetTickCount();
                                 if (!m_httpOk.count(host) && !m_httpOk.count(RegDom(host))) {
@@ -795,6 +807,7 @@ void BrowserWindow::InitWebView2(int tabIndex) {
                                 RecordHistory(t2->url, ttl.get() ? ttl.get() : L"");
                             }
                             if (tabIndex == m_activeTab) {
+                                if (navOk && !internal) AppDetectSoon();
                                 UpdateOmniboxText(t2->url);
                                 UpdateNavButtons();
                                 InvalidateRect(m_hWnd, nullptr, FALSE);
@@ -965,7 +978,7 @@ void BrowserWindow::InitWebView2(int tabIndex) {
                                                         Gdiplus::Bitmap* bm = nullptr;
                                                         { Gdiplus::Bitmap tmp(ms); if (tmp.GetLastStatus() == Gdiplus::Ok) bm = tmp.Clone(0, 0, tmp.GetWidth(), tmp.GetHeight(), PixelFormat32bppARGB); }
                                                         ms->Release();
-                                                        if (bm) { t->fav.reset(bm, [](void* p) { delete (Gdiplus::Bitmap*)p; }); InvalidateRect(m_hWnd, nullptr, FALSE); }
+                                                        if (bm) { t->fav.reset(bm, [](void* p) { delete (Gdiplus::Bitmap*)p; }); if (!t->incognito) m_siteFav[HostOf(t->url)] = t->fav; if (t == m_sitePanel) SiteSaveIcon(bytes, t->fav); InvalidateRect(m_hWnd, nullptr, FALSE); }
                                                     }
                                                 }
                                                 if (IndexOf(t) < 0 || t->incognito || m_incognito) return S_OK;   // private: never saved
@@ -1115,6 +1128,9 @@ q.addEventListener('blur',()=>setTimeout(()=>sg.hidden=true,120))})();
 // ─── Tab Management ───────────────────────────────────────────────────────────
 void BrowserWindow::OpenTab(const std::wstring& url, bool incognito, bool background) {
     if (incognito && m_child) return;   // Child Safety: no private tabs
+    if (m_app && !m_tabs.empty()) {   // an app window has one page only: anything it opens (target=_blank, window.open) goes to the browser
+        AppToBrowser(url); return;
+    }
     auto tab       = std::make_unique<Tab>();
     tab->url       = url;
     tab->incognito = incognito || m_incognito;
@@ -1146,6 +1162,7 @@ void BrowserWindow::CloseTab(int index) {
     if (index < 0 || index >= (int)m_tabs.size()) return;
     // Unregister events & close controller
     Tab* t = m_tabs[index].get();
+    if (t == m_sitePanel) m_sitePanel = nullptr;
     if (t->url == L"libra://agent") { AgStop(nullptr); m_agDock = false; }   // however the assistant is closed (button, tab X, shortcut), everything it was doing stops
     if (!t->incognito && !m_incognito && IsHttp(t->url)) { m_closed.push_back(t->url); if (m_closed.size() > 20) m_closed.erase(m_closed.begin()); }
     if (t->webView) {
@@ -1199,7 +1216,7 @@ void BrowserWindow::SwitchTab(int index) {
     SetWindowTextW(m_hWnd, title.c_str());
     m_progressVisible = t->loading;
     m_displayProgress = t->progress;
-    if (m_agDock) ApplyDock();
+    if (DockOn()) ApplyDock();
     InvalidateRect(m_hWnd, nullptr, FALSE);
 }
 
@@ -1264,7 +1281,8 @@ void BrowserWindow::OnOmniboxReturn() {
 }
 
 void BrowserWindow::UpdateOmniboxText(const std::wstring& url) {
-    if (m_agDock) PostMessage(m_hWnd, WM_APP + 32, 0, 0);   // the address changed: show or hide the docked Assistant
+    AppRelayout();
+    if (DockOn()) PostMessage(m_hWnd, WM_APP + 32, 0, 0);   // the address changed: show or hide the docked Assistant
     // Don't show internal scheme
     std::wstring u = url;
     if (u == L"libra://error" && m_activeTab >= 0 && m_activeTab < (int)m_tabs.size()) u = m_tabs[m_activeTab]->errUrl;
@@ -1288,37 +1306,40 @@ void BrowserWindow::SetAdBlockEnabled(bool enabled) {
 // ─── Layout ───────────────────────────────────────────────────────────────────
 RECT BrowserWindow::WebViewRect() const {
     RECT cr; GetClientRect(m_hWnd, &cr);
-    int tabH  = MulDiv(Layout::TabBarHeight,  m_dpi, 96);
+    int tabH  = TabHpx();
     int toolH = MulDiv(Layout::ToolbarHeight, m_dpi, 96);
     int top   = (m_full || m_setup) ? 0 : tabH + toolH;   // first-run setup: no address bar at all
-    return { 0, top, cr.right, cr.bottom };
+    return { 0, top, cr.right - SiteW(), cr.bottom };
 }
 
 void BrowserWindow::ResizeWebViews() {
     RECT wvRect = WebViewRect(), pan = wvRect;
     const int ai = AgDockIdx(); const bool dock = ai >= 0 && ai != m_activeTab && AgAllowedHere();   // agent sidebar: right strip, other tabs shrink
     if (dock) { int w = std::min<int>(MulDiv(400, m_dpi, 96), (wvRect.right - wvRect.left) / 2); wvRect.right -= w; pan.left = pan.right - w; }
+    const int si = m_sitePanel ? IndexOf(m_sitePanel) : -1; const bool sdock = si >= 0 && si != m_activeTab; RECT spn = wvRect;   // sites sidebar: panel beside the page
+    if (sdock) { int w = std::min<int>(MulDiv(480, m_dpi, 96), (wvRect.right - wvRect.left) / 2); wvRect.right -= w; spn.left = spn.right - w; }
     for (int i = 0; i < (int)m_tabs.size(); ++i)
         if (m_tabs[i]->controller)
-            m_tabs[i]->controller->put_Bounds(dock && i == ai ? pan : wvRect);
+            m_tabs[i]->controller->put_Bounds(sdock && i == si ? spn : dock && i == ai ? pan : wvRect);
 }
 
 RECT BrowserWindow::TabRect(int index) const {
     RECT cr; GetClientRect(m_hWnd, &cr);
-    int n = (int)m_tabs.size();
-    if (n == 0 || index < 0 || index >= n) return {};
-    int tabH   = MulDiv(Layout::TabBarHeight, m_dpi, 96);
+    int total0 = (int)m_tabs.size(), n = 0;
+    for (int i = 0; i < total0; ++i) if (!TabHid(i)) ++n;
+    if (n == 0 || index < 0 || index >= total0 || TabHid(index)) return {};
+    int tabH   = TabHpx();
     int margin = MulDiv(Layout::TabMargin, m_dpi, 96);
     int pw     = MulDiv(46, m_dpi, 96);                      // pinned tabs: icon only
-    int np = 0; for (auto& t : m_tabs) if (t->pinned) ++np;
+    int np = 0; for (int i = 0; i < total0; ++i) if (!TabHid(i) && m_tabs[i]->pinned) ++np;
     int avail  = cr.right - tabH - margin - np * pw;         // tabH = room for the + button
     int tw     = (n > np) ? std::clamp(avail / (n - np), MulDiv(Layout::TabMinWidth, m_dpi, 96), MulDiv(Layout::TabMaxWidth, m_dpi, 96)) : 0;
     int x = margin;
     {   // more tabs than fit: slide the strip so the active tab is always visible (it used to run off the window, taking the + button and the tabs behind it out of reach)
         int total = np * pw + (n - np) * tw, view = cr.right - tabH - margin;
-        if (total > view && m_activeTab >= 0 && m_activeTab < n) { int aEnd = 0; for (int i = 0; i <= m_activeTab; ++i) aEnd += m_tabs[i]->pinned ? pw : tw; x -= std::clamp(aEnd - view, 0, total - view); }
+        if (total > view && m_activeTab >= 0 && m_activeTab < total0 && !TabHid(m_activeTab)) { int aEnd = 0; for (int i = 0; i <= m_activeTab; ++i) if (!TabHid(i)) aEnd += m_tabs[i]->pinned ? pw : tw; x -= std::clamp(aEnd - view, 0, total - view); }
     }
-    for (int i = 0; i < index; ++i) x += m_tabs[i]->pinned ? pw : tw;
+    for (int i = 0; i < index; ++i) if (!TabHid(i)) x += m_tabs[i]->pinned ? pw : tw;
     return { x, 0, x + (m_tabs[index]->pinned ? pw : tw), tabH };
 }
 
@@ -1332,8 +1353,8 @@ RECT BrowserWindow::TabCloseRect(int index) const {
     return { cx, cy, cx + sz, cy + sz };
 }
 
-int BrowserWindow::TabIndexAt(int x, int y) const {
-    int tabH = MulDiv(Layout::TabBarHeight, m_dpi, 96);
+int BrowserWindow::TabIndexAt(int x, int y) const {   // hidden side-panel tabs have an empty rect and are never hit
+    int tabH = TabHpx();
     if (y < 0 || y >= tabH) return -1;
     for (int i = 0; i < (int)m_tabs.size(); ++i) {
         RECT r = TabRect(i);
@@ -1350,13 +1371,13 @@ bool BrowserWindow::TabCloseHit(int tabIndex, int x, int y) const {
 // ─── Painting ────────────────────────────────────────────────────────────────
 void BrowserWindow::OnPaint(HDC hdc, RECT cr) {
     if (m_setup) { HBRUSH w = CreateSolidBrush(RGB(255, 255, 255)); FillRect(hdc, &cr, w); DeleteObject(w); return; }   // first run: blank until the film starts, no tab strip / toolbar painted
-    int tabH  = MulDiv(Layout::TabBarHeight,  m_dpi, 96);
+    int tabH  = TabHpx();
     int toolH = MulDiv(Layout::ToolbarHeight, m_dpi, 96);
 
     RECT tabBarRect  = { 0, 0,       cr.right, tabH };
     RECT toolbarRect = { 0, tabH,    cr.right, tabH + toolH };
 
-    PaintTabBar (hdc, tabBarRect);
+    if (!m_app) PaintTabBar (hdc, tabBarRect);
     PaintToolbar(hdc, toolbarRect);
     if (m_progressVisible)
         PaintProgressBar(hdc, toolbarRect);
@@ -1376,6 +1397,7 @@ void BrowserWindow::PaintTabBar(HDC hdc, const RECT& r) {
 
     for (int i = 0; i < n; ++i) {
         RECT tr     = TabRect(i);
+        if (IsRectEmpty(&tr)) continue;
         bool active = (i == m_activeTab);
         bool hover  = (i == m_hoveredTab);
         bool incog  = m_tabs[i]->incognito;
@@ -1386,6 +1408,8 @@ void BrowserWindow::PaintTabBar(HDC hdc, const RECT& r) {
                    incog ? Color::DarkBorder : Color::OmniboxBorder, 1.f);
         else if (hover)
             FillRR(hdc, pill, rad, incog ? Color::DarkTab : Color::TabHover);
+        const bool inl = !incog && m_tabs[i]->url.rfind(L"libra://", 0) == 0 && m_tabs[i]->url != L"libra://home";   // Libra's own pages: dark tab, so it is clear they are not websites
+        if (inl) FillRR(hdc, pill, rad, active ? RGB(34, 34, 34) : RGB(78, 78, 78), 255, RGB(34, 34, 34), 1.f);
 
         if (m_tabs[i]->shown > 0.005f) {   // the tab itself fills with a soft gradient while its page loads
             Gdiplus::Graphics g(hdc); g.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
@@ -1405,7 +1429,14 @@ void BrowserWindow::PaintTabBar(HDC hdc, const RECT& r) {
             wchar_t c0 = title[0];
             letter[0] = (c0 >= L'a' && c0 <= L'z') ? (wchar_t)(c0 - 32) : c0;
         }
-        if (m_tabs[i]->fav) {
+        if (inl) {   // symbol of the page instead of a letter disc
+            const std::wstring& u = m_tabs[i]->url; wchar_t g = 0xE80F;
+            static const struct { const wchar_t* k; wchar_t g; } gl[] = { { L"settings", 0xE713 }, { L"history", 0xE81C }, { L"downloads", 0xE896 }, { L"bookmarks", 0xE734 }, { L"passwords", 0xE192 }, { L"privacy", 0xE72E }, { L"appearance", 0xE790 }, { L"agent", 0xE99A }, { L"tabs", 0xE8A1 }, { L"pdfsign", 0xE70F }, { L"reader", 0xE736 } };
+            for (auto& e : gl) if (u.find(e.k) != std::wstring::npos) { g = e.g; break; }
+            HFONT gf = CreateFontW(-fav * 4 / 5, 0, 0, 0, FW_NORMAL, 0, 0, 0, DEFAULT_CHARSET, 0, 0, CLEARTYPE_QUALITY, 0, L"Segoe MDL2 Assets"), of = (HFONT)SelectObject(hdc, gf);
+            RECT gr = { favX, favY, favX + fav, favY + fav }; SetBkMode(hdc, TRANSPARENT); SetTextColor(hdc, RGB(255, 255, 255));
+            DrawTextW(hdc, &g, 1, &gr, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX); SelectObject(hdc, of); DeleteObject(gf);
+        } else if (m_tabs[i]->fav) {
             Gdiplus::Graphics gi(hdc); gi.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
             gi.DrawImage((Gdiplus::Bitmap*)m_tabs[i]->fav.get(), favX, favY, fav, fav);
         } else {   // outlined disc, no colour
@@ -1419,7 +1450,7 @@ void BrowserWindow::PaintTabBar(HDC hdc, const RECT& r) {
             DrawLineAA(hdc, cx - h2, cy - h2, cx + h2, cy + h2, Color::TextPrimary, 1.6f);
             DrawLineAA(hdc, cx + h2, cy - h2, cx - h2, cy + h2, Color::TextPrimary, 1.6f);
         }
-        if (!m_tabs[i]->fav && !m_tabs[i]->loading) {
+        if (!inl && !m_tabs[i]->fav && !m_tabs[i]->loading) {
             RECT lr = { favX, favY, favX + fav, favY + fav };
             SetBkMode(hdc, TRANSPARENT);
             SetTextColor(hdc, incog ? Color::IncognitoText : Color::TextPrimary);
@@ -1432,7 +1463,7 @@ void BrowserWindow::PaintTabBar(HDC hdc, const RECT& r) {
         RECT textRect = pill;
         textRect.left  = favX + fav + MulDiv(8, m_dpi, 96);
         textRect.right = pill.right - MulDiv(30, m_dpi, 96);
-        COLORREF textCol = active ? (incog ? Color::IncognitoText : Color::TextPrimary)
+        COLORREF textCol = inl ? (active ? RGB(255, 255, 255) : RGB(225, 225, 225)) : active ? (incog ? Color::IncognitoText : Color::TextPrimary)
                                   : Color::TextSecondary;
         SetTextColor(hdc, textCol);
         SetBkMode(hdc, TRANSPARENT);
@@ -1447,17 +1478,17 @@ void BrowserWindow::PaintTabBar(HDC hdc, const RECT& r) {
             RECT cr2 = TabCloseRect(i);
             cr2.left -= gap / 2; cr2.right -= gap / 2;
             int cx = (cr2.left + cr2.right) / 2, cy = (cr2.top + cr2.bottom) / 2;
-            if (hover) FillCircle(hdc, cx, cy, (cr2.right - cr2.left) / 2, incog ? Color::DarkTab : Color::ButtonHover);
+            if (hover) FillCircle(hdc, cx, cy, (cr2.right - cr2.left) / 2, inl ? RGB(90, 90, 90) : incog ? Color::DarkTab : Color::ButtonHover);
             float h2 = MulDiv(4, m_dpi, 96) * 1.f;
             float w  = MulDiv(3, m_dpi, 192) * 1.f + 0.6f;
-            DrawLineAA(hdc, cx - h2, cy - h2, cx + h2, cy + h2, incog ? Color::IncognitoText : Color::TextSecondary, w);
-            DrawLineAA(hdc, cx + h2, cy - h2, cx - h2, cy + h2, incog ? Color::IncognitoText : Color::TextSecondary, w);
+            DrawLineAA(hdc, cx - h2, cy - h2, cx + h2, cy + h2, inl ? RGB(255, 255, 255) : incog ? Color::IncognitoText : Color::TextSecondary, w);
+            DrawLineAA(hdc, cx + h2, cy - h2, cx - h2, cy + h2, inl ? RGB(255, 255, 255) : incog ? Color::IncognitoText : Color::TextSecondary, w);
         }
     }
 
     // New-tab (+) button: round plate
     int tabH  = r.bottom - r.top;
-    int newX  = (n > 0) ? TabRect(n - 1).right : MulDiv(Layout::TabMargin, m_dpi, 96);
+    int newX  = (LastVisTab() >= 0) ? TabRect(LastVisTab()).right : MulDiv(Layout::TabMargin, m_dpi, 96);
     int btnSz = MulDiv(30, m_dpi, 96);
     int bY    = (tabH - btnSz) / 2;
     int pcx   = newX + MulDiv(6, m_dpi, 96) + btnSz / 2;
@@ -1481,6 +1512,12 @@ void BrowserWindow::PaintToolbar(HDC hdc, const RECT& r) {
     LineTo  (hdc, r.right, r.bottom - 1);
     SelectObject(hdc, old); DeleteObject(bord);
 
+    if (m_app) {   // app window: lock + site name instead of the address bar
+        RECT gr = { MulDiv(8, m_dpi, 96) + (MulDiv(Layout::ButtonSize, m_dpi, 96) + MulDiv(2, m_dpi, 96)) * 2 + MulDiv(6, m_dpi, 96), r.top, 0, r.bottom }; gr.right = gr.left + MulDiv(22, m_dpi, 96);
+        bool sec = !m_tabs.empty() && m_tabs[0]->url.rfind(L"https://", 0) == 0; DrawGlyph(hdc, sec ? L"\uE72E" : L"\uE785", gr, MulDiv(13, m_dpi, 96), Color::TextSecondary);
+        RECT tr = { gr.right + MulDiv(2, m_dpi, 96), r.top, r.right - MulDiv(10, m_dpi, 96), r.bottom }; HGDIOBJ of = SelectObject(hdc, m_fontUI); SetBkMode(hdc, TRANSPARENT); SetTextColor(hdc, Color::TextPrimary);
+        DrawTextW(hdc, m_appName.c_str(), -1, &tr, DT_SINGLELINE | DT_VCENTER | DT_LEFT | DT_END_ELLIPSIS | DT_NOPREFIX); SelectObject(hdc, of); return;
+    }
     // Address-bar pill
     RECT pill = OmniPillRect();
     int  rad  = (pill.bottom - pill.top) / 2;
@@ -1500,6 +1537,7 @@ void BrowserWindow::PaintToolbar(HDC hdc, const RECT& r) {
               inc ? Color::IncognitoText : Color::TextSecondary);
     if (m_activeTab >= 0 && m_activeTab < (int)m_tabs.size() && IsHttp(m_tabs[m_activeTab]->url)) {
         if (m_set.On(L"save_video") && !m_tabs[m_activeTab]->vids.empty()) DrawGlyph(hdc, L"\uE896", VidRect(), MulDiv(15, m_dpi, 96), Color::TextPrimary);
+        if (!SiteOn()) PaintAppIcon(hdc);
         RECT sr = StarRect();
         DrawGlyph(hdc, IsBookmarked(m_tabs[m_activeTab]->url) ? L"\uE735" : L"\uE734", sr, MulDiv(15, m_dpi, 96), Color::TextPrimary);
     }
@@ -1541,7 +1579,7 @@ LRESULT CALLBACK BrowserWindow::WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPAR
         HDC hdc     = BeginPaint(hWnd, &ps);
         // Double-buffer to eliminate flicker
         RECT cr; GetClientRect(hWnd, &cr);
-        int tabH  = MulDiv(Layout::TabBarHeight,  bw->m_dpi, 96);
+        int tabH  = bw->TabHpx();
         int toolH = MulDiv(Layout::ToolbarHeight, bw->m_dpi, 96);
         int uiH   = tabH + toolH;
         HDC memDC   = CreateCompatibleDC(hdc);
@@ -1549,6 +1587,7 @@ LRESULT CALLBACK BrowserWindow::WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPAR
         HBITMAP old = (HBITMAP)SelectObject(memDC, bmp);
         bw->OnPaint(memDC, cr);
         BitBlt(hdc, 0, 0, cr.right, uiH, memDC, 0, 0, SRCCOPY);
+        bw->PaintSites(hdc);   // sites strip: below the buffered top bar, drawn straight onto the window
         SelectObject(memDC, old);
         DeleteObject(bmp);
         DeleteDC(memDC);
@@ -1556,6 +1595,7 @@ LRESULT CALLBACK BrowserWindow::WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPAR
         return 0;
     }
     case WM_SIZE:
+        if (bw->m_app && (wParam == SIZE_MINIMIZED || wParam == SIZE_RESTORED || wParam == SIZE_MAXIMIZED)) bw->AppMinimized(wParam == SIZE_MINIMIZED);
         bw->OnSize(LOWORD(lParam), HIWORD(lParam));
         return 0;
     case WM_COMMAND:
@@ -1567,7 +1607,7 @@ LRESULT CALLBACK BrowserWindow::WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPAR
     case WM_LBUTTONDBLCLK: {
         // Double-click on tab bar: open new tab
         int x2 = GET_X_LPARAM(lParam), y = GET_Y_LPARAM(lParam);
-        int tabH2 = MulDiv(Layout::TabBarHeight, bw->m_dpi, 96);
+        int tabH2 = bw->TabHpx();
         if (y < tabH2 && bw->TabIndexAt(x2, y) < 0) bw->OpenTab(L"");   // empty strip only: double-clicking a tab itself must not add one
         return 0;
     }
@@ -1591,6 +1631,7 @@ LRESULT CALLBACK BrowserWindow::WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPAR
         InvalidateRect(hWnd, nullptr, FALSE);
         return 0;
     case WM_RBUTTONDOWN: {
+        if (bw->SiteRight(GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam))) return 0;
         int ti = bw->TabIndexAt(GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
         POINT pt = { GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam) };
         ClientToScreen(hWnd, &pt);
@@ -1624,6 +1665,8 @@ LRESULT CALLBACK BrowserWindow::WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPAR
     }
     case WM_APP + 30: bw->OnWinAuth((int)wParam, (int)lParam); return 0;   // Windows sign-in answered
     case WM_APP + 32: bw->ApplyDock(); return 0;
+    case WM_APP + 70: bw->SiteIconGot((void*)lParam); return 0;
+    case WM_APP + 71: bw->AppInstalled((void*)lParam); return 0;
     case WM_APP + 33: bw->ToggleAgent(); return 0;
     case WM_APP + 34: bw->AgFileChosen((void*)lParam); return 0;
     case WM_APP + 36: bw->OnVoiceMsg((void*)lParam); return 0;
@@ -1769,9 +1812,11 @@ void BrowserWindow::OnSize(int cx, int cy) {
 }
 
 void BrowserWindow::OnLButtonDown(int x, int y) {
-    int tabH = MulDiv(Layout::TabBarHeight, m_dpi, 96);
+    if (SiteClick(x, y)) return;
+    int tabH = TabHpx();
     if (y >= tabH) {   // toolbar: bookmark star
         RECT sr = StarRect(); POINT pt = { x, y };
+        if (AppOffer() && !SiteOn()) { RECT ar = AppRect(); if (PtInRect(&ar, pt)) { AppInstallAsk(); return; } }
         if (m_activeTab >= 0 && m_set.On(L"save_video") && !m_tabs[m_activeTab]->vids.empty()) { RECT vr = VidRect(); if (PtInRect(&vr, pt)) { ShowVideoPopup(); return; } }
         if (PtInRect(&sr, pt)) ToggleBookmark();
         return;
@@ -1792,7 +1837,7 @@ void BrowserWindow::OnLButtonDown(int x, int y) {
 
     // New-tab (+) button?
     int n    = (int)m_tabs.size();
-    int newX = (n > 0) ? TabRect(n - 1).right : 0;
+    int newX = (LastVisTab() >= 0) ? TabRect(LastVisTab()).right : 0;
     int btnSz = MulDiv(28, m_dpi, 96);
     if (x >= newX && x <= newX + MulDiv(40, m_dpi, 96) && y < tabH)
         OpenTab(L"");
@@ -1843,7 +1888,9 @@ void BrowserWindow::OnCommand(WPARAM wParam, LPARAM lParam) {
         HMENU m = CreatePopupMenu();
         static HBRUSH white = CreateSolidBrush(RGB(255, 255, 255));
         MENUINFO mi{ sizeof(mi), MIM_BACKGROUND | MIM_STYLE, MNS_NOCHECK, 0, white, 0, 0 }; SetMenuInfo(m, &mi);
-        if (!m_child) { if (m_incognito) AppendMenuW(m, MF_OWNERDRAW, 9110, (LPCWSTR)&kMenuIts[10]); AppendMenuW(m, MF_OWNERDRAW, 9107, (LPCWSTR)&kMenuIts[7]); if (!m_incognito) AppendMenuW(m, MF_OWNERDRAW, 9108, (LPCWSTR)&kMenuIts[8]); AppendMenuW(m, MF_OWNERDRAW | MF_SEPARATOR, 0, nullptr); }
+        if (!m_child) { if (m_incognito) AppendMenuW(m, MF_OWNERDRAW, 9110, (LPCWSTR)&kMenuIts[10]); AppendMenuW(m, MF_OWNERDRAW, 9107, (LPCWSTR)&kMenuIts[7]); if (!m_incognito) AppendMenuW(m, MF_OWNERDRAW, 9108, (LPCWSTR)&kMenuIts[8]);
+            if (!m_incognito && !m_app && m_activeTab >= 0 && m_activeTab < (int)m_tabs.size() && AppHostOk(m_tabs[m_activeTab]->url)) AppendMenuW(m, MF_OWNERDRAW, 9111, (LPCWSTR)&kMenuIts[11]);
+            AppendMenuW(m, MF_OWNERDRAW | MF_SEPARATOR, 0, nullptr); }
         for (int k = 0; k < 7; ++k) {
             if (k == 4 || k == 5) continue;   // Privacy and Tabs live elsewhere
             if (k == 6) AppendMenuW(m, MF_OWNERDRAW | MF_SEPARATOR, 0, nullptr);
@@ -1855,6 +1902,7 @@ void BrowserWindow::OnCommand(WPARAM wParam, LPARAM lParam) {
         if (pick == 9110) NewNormalWindow();
         else if (pick == 9107) NewPrivateWindow();
         else if (pick == 9108) Burn();
+        else if (pick == 9111) AppInstallAsk(true);
         else if (pick == 9109) OpenShot();
         else if (pick >= 9100 && pick < 9107) { if (std::wstring(kMenuIts[pick - 9100].u) == L"libra://agent") ToggleAgent(); else ShowInternal(kMenuIts[pick - 9100].u); }
         break; }
@@ -1896,6 +1944,8 @@ void BrowserWindow::OnTimer(UINT_PTR id) {
     }
     if (id == 2003) { PwClipClear(); return; }
     if (id == 2004) { KillTimer(m_hWnd, 2004); FirstBlock(); return; }
+    if (id == 2080) { KillTimer(m_hWnd, 2080); AppDetectRun(); return; }
+    if (id == 2081) { KillTimer(m_hWnd, 2081); wchar_t ti[8]; TestEnv(L"LIBRA_TEST_APPINSTALL", ti, 8); AppInstallAsk(ti[0] == L'm'); return; }
     if (id == 2005) { DlPush(); return; }
     if (id == 2031) {   // a new local day: every tab gets the new identity script
         if (m_fpDay && StatDay(0) != m_fpDay) for (auto& tb : m_tabs) InstallFpScript(tb.get());
@@ -1947,14 +1997,14 @@ void BrowserWindow::OnTimer(UINT_PTR id) {
             if (tb->loading && tb->url.rfind(L"libra://", 0) != 0) { tb->shown += (0.92f - tb->shown) * 0.035f; if (tb->shown < 0.04f) tb->shown = 0.04f; anim = true; }
             else if (tb->shown > 0.f && tb->url.rfind(L"libra://", 0) != 0) { tb->shown += (1.f - tb->shown) * 0.35f; if (tb->shown > 0.99f) tb->shown = 0.f; anim = true; }
         }
-        if (anim) { RECT c0; GetClientRect(m_hWnd, &c0); RECT tr0 = { 0, 0, c0.right, MulDiv(Layout::TabBarHeight, m_dpi, 96) }; InvalidateRect(m_hWnd, &tr0, FALSE); }
+        if (anim) { RECT c0; GetClientRect(m_hWnd, &c0); RECT tr0 = { 0, 0, c0.right, TabHpx() }; InvalidateRect(m_hWnd, &tr0, FALSE); }
     }
     {   // every ~2 s: put long-hidden tabs to sleep (memory + CPU), never ones that are loading or playing sound
         static int tick = 0;
         if (++tick % 125 == 0) {
-            { static int c2 = 0; if (++c2 % 15 == 0) { SaveSession(); if (m_totalDirty) { m_set.Set(L"blocked_total", std::to_wstring(m_totalBlocked)); m_totalDirty = false; } if (m_statDirty) StatSave(); } }   // saved every ~30 s
+            { static int c2 = 0; if (++c2 % 15 == 0) { if (!m_incognito) { m_set.Refresh(); if (m_set.On(L"meter_on") && !Mt::Find()) Mt::Launch(); }   /* meter switched on but not running (an update closed it): start it again */ SaveSession(); if (m_totalDirty) { m_set.Set(L"blocked_total", std::to_wstring(m_totalBlocked)); m_totalDirty = false; } if (m_statDirty) StatSave(); } }   // saved every ~30 s
             DWORD now = GetTickCount(), limit = m_lowEnd ? 6000 : 12000; if (m_tabs.size() > 8) limit /= 2;   // many tabs: sleep background tabs quickly
-            if (!m_incognito && !m_setup && m_set.Get(L"idle_prompt", L"1") != L"0" && GetForegroundWindow() == m_hWnd && !(m_hPw && IsWindowVisible(m_hPw))) {   // ask once about a tab nobody has used for a long time
+            if (!m_incognito && !m_setup && !m_app && m_set.Get(L"idle_prompt", L"1") != L"0" && GetForegroundWindow() == m_hWnd && !(m_hPw && IsWindowVisible(m_hPw))) {   // ask once about a tab nobody has used for a long time
                 DWORD idleMs = (DWORD)(_wtof(m_set.Get(L"idle_min", L"20").c_str()) * 60000.0);
                 for (auto& tb : m_tabs) {
                     Tab* t = tb.get(); BOOL audio = FALSE; wil::com_ptr<ICoreWebView2_8> w8;
@@ -2001,21 +2051,23 @@ void BrowserWindow::OnTimer(UINT_PTR id) {
 
     // Only invalidate the toolbar strip to avoid repainting WebView area
     RECT cr; GetClientRect(m_hWnd, &cr);
-    int tabH  = MulDiv(Layout::TabBarHeight,  m_dpi, 96);
+    int tabH  = TabHpx();
     int toolH = MulDiv(Layout::ToolbarHeight, m_dpi, 96);
     RECT toolRect = { 0, tabH, cr.right, tabH + toolH };
     InvalidateRect(m_hWnd, &toolRect, FALSE);
 }
 
-void BrowserWindow::SaveSession() {   // the open tabs; also written every ~30 s, so a crash or a killed process does not lose them
+void BrowserWindow::SaveSession() {
+    if (m_app) return;   // the open tabs; also written every ~30 s, so a crash or a killed process does not lose them
     if (m_incognito || m_setup) return;
     SavePinned();
     std::string o; int n = 0;
-    for (auto& tb : m_tabs) if (!tb->incognito && !tb->pinned && IsHttp(tb->url) && n++ < 20) o += ToUtf8(Flat(tb->url)) + "\n";
+    for (auto& tb : m_tabs) if (tb.get() != m_sitePanel && !tb->incognito && !tb->pinned && IsHttp(tb->url) && n++ < 20) o += ToUtf8(Flat(tb->url)) + "\n";
     static std::string last; if (o == last) return; last = o;   // unchanged: no disk write
     WriteAll(DataDir() + L"\\session.txt", o);
 }
-void BrowserWindow::SaveState() {   // everything that must reach the disk: when the window closes, and when Windows ends the session (shutdown, restart, sign-out send no WM_CLOSE)
+void BrowserWindow::SaveState() {
+    if (m_app) { PwClipClear(); return; }   // an app window never writes the browser's history, session or counters   // everything that must reach the disk: when the window closes, and when Windows ends the session (shutdown, restart, sign-out send no WM_CLOSE)
     HoldSandboxCleanup(); SnSave();
     Verdicts::Get().Save();
     { wchar_t tf[MAX_PATH]; if (TestEnv(L"LIBRA_TEST_VLOG", tf, MAX_PATH)) { std::string o = "local=" + std::to_string(Verdicts::Get().localHits.load()) + " cloud=" + std::to_string(Verdicts::Get().cloudAsks.load()) + " table=" + std::to_string(Verdicts::Get().Count()) + "\n"; WriteAllRaw(tf, o, true); } }   // test hook only
@@ -2129,6 +2181,7 @@ void BrowserWindow::SaveBookmarks() {
 }
 
 void BrowserWindow::RecordHistory(const std::wstring& url, const std::wstring& title) {
+    if (m_app) return;
     if (!IsHttp(url)) return;
     if (m_set.Get(L"history_keep", L"") == L"0") return;   // "Do not keep"
     PruneHistory();
@@ -2167,7 +2220,7 @@ std::wstring BrowserWindow::PageHtml(const std::wstring& url) {
         }
         return TabsPage(v, g);
     }
-    if (url == L"libra://settings")  { long long lo = DohProxy::Get().LastOk(), n = (long long)time(nullptr); return SettingsPage(m_set, g, lo ? (n - lo < 900 ? L"Online" : L"Idle") : L"Ready", (long long)m_totalBlocked); }
+    if (url == L"libra://settings")  { long long lo = DohProxy::Get().LastOk(), n = (long long)time(nullptr); return SettingsPage(m_set, g, lo ? (n - lo < 900 ? L"Online" : L"Idle") : L"Ready", (long long)m_totalBlocked, AppsHtml()); }
     if (url == L"libra://history")   return HistoryPage(m_hist, g);
     if (url == L"libra://passwords") { PwLoad(); return PasswordsPage(m_vault, g); }
     if (url == L"libra://bookmarks") { ReloadBookmarks(); return BookmarksPage(m_bm, g); }
@@ -2216,6 +2269,7 @@ void BrowserWindow::StartupTabs() {
     { wchar_t rv[8]; if (TestEnv(L"LIBRA_TEST_READER", rv, 8)) SetTimer(m_hWnd, 2073, 12000, nullptr); }
     SetTimer(m_hWnd, 2031, 300000, nullptr);   // new day -> new fingerprint identity
     SetTimer(m_hWnd, 2006, 4000, nullptr);   // background tabs keep a small memory footprint
+    if (m_app) { OpenTab(m_appUrl); ResizeWebViews(); return; }   // app window: its page only (no session, pinned tabs, sponsored feed or update check)
     UpLoad(); SponsorLoad(); { wchar_t sf[8]; SetTimer(m_hWnd, 2040, TestEnv(L"LIBRA_TEST_SPFEED", sf, 8) ? 1500 : 30000, nullptr); }   // sponsored feed: cached copy now, a daily fetch soon after start
     int np = 0;
     if (!m_incognito)
@@ -2438,6 +2492,7 @@ void BrowserWindow::OnPageMessage(int idx, const std::wstring& msg) {
     if (c.rfind(L"pw.", 0) == 0) { OnPwPage(idx, v); return; }
     if (c.rfind(L"priv.", 0) == 0) { OnPrivPage(idx, v); return; }
     if (c.rfind(L"agent.", 0) == 0) { OnAgentPage(idx, v); return; }
+    if ((c == L"app.open" || c == L"app.del") && m_tabs[idx]->url == L"libra://settings") { if (c == L"app.open") AppLaunch(a); else { AppRemove(a); RenderTab(idx); } return; }
     if (c == L"home.del") {
         m_sites.erase(std::remove_if(m_sites.begin(), m_sites.end(), [&](auto& s) { return s.first == a; }), m_sites.end());
         m_tileMeta.erase(a); SaveSites(); TilesSave(m_tileMeta); RenderTab(idx); return;
@@ -2473,7 +2528,7 @@ void BrowserWindow::OnPageMessage(int idx, const std::wstring& msg) {
     if (c == L"family.toggle") { AskWindows(m_child ? 2 : 1); return; }
     if (c == L"family.unlock") { if (m_child && idx == m_activeTab) { m_authHost = HostOf(m_tabs[idx]->errUrl); AskWindows(4); } return; }
     if (c == L"set") {
-        static const wchar_t* keys[] = { L"accent", L"meter_on", L"meter_start", L"meter_size", L"meter_top", L"meter_dock", L"meter_opacity", L"block_recall", L"history_keep", L"engine", L"engine_url", L"startup", L"homepage", L"dl_ask", L"dl_dir", L"clear_start", L"local_block", L"block_images", L"perm_allow", L"smartscreen_off", L"perf", L"block_default", L"save_video", L"https_upgrade", L"fingerprint", L"block_3p", L"fp_a11y", L"tz_utc", L"keep_signin", L"agent_on", L"agent_btn", L"agent_opt", L"agent_vauto", L"sponsored", L"sn_count", L"autosuggest" };
+        static const wchar_t* keys[] = { L"accent", L"meter_on", L"meter_start", L"meter_size", L"meter_top", L"meter_dock", L"meter_opacity", L"block_recall", L"history_keep", L"engine", L"engine_url", L"startup", L"homepage", L"dl_ask", L"dl_dir", L"clear_start", L"local_block", L"block_images", L"perm_allow", L"smartscreen_off", L"perf", L"block_default", L"save_video", L"https_upgrade", L"fingerprint", L"block_3p", L"fp_a11y", L"tz_utc", L"keep_signin", L"agent_on", L"agent_btn", L"agent_opt", L"agent_vauto", L"sponsored", L"sn_count", L"autosuggest", L"site_dock", L"site_list" };
         if (std::none_of(std::begin(keys), std::end(keys), [&](const wchar_t* k) { return a == k; })) return;
         if (val.size() > 500) return;
         if (a == L"engine") {
@@ -2493,12 +2548,16 @@ void BrowserWindow::OnPageMessage(int idx, const std::wstring& msg) {
         if (a == L"block_default" && val != L"0" && val != L"1" && val != L"2") return;
         if (m_child && a == L"block_default" && val == L"2") return;   // Child Safety: protection cannot be switched off
         if (a == L"dl_dir" && !val.empty()) { DWORD at = GetFileAttributesW(val.c_str()); if (at == INVALID_FILE_ATTRIBUTES || !(at & FILE_ATTRIBUTE_DIRECTORY)) return; }
+        const std::wstring oldEu = (a == L"engine" || a == L"engine_url") ? EngineUrl() : L"";
         m_set.Set(a, val);
+        if (!oldEu.empty()) SwitchEngineTabs(oldEu);
         if (a == L"accent") ApplyTheme();
         if (a == L"meter_on") { if (val == L"1") Mt::Launch(); else Mt::Stop(); }   // the meter is its own process; it also watches this setting
         if (a == L"meter_start") Mt::SetRun(val == L"1");
         if (a == L"block_recall") { HideFromRecall(m_hWnd); HideFromRecall(m_hSug); HideFromRecall(m_hShield); HideFromRecall(m_hPw); }
         if (a == L"history_keep") PruneHistory();
+        if (a == L"site_list" && val.size() > 1500) return;
+        if (a == L"site_dock" || a == L"site_list") { ApplyDock(); ResizeWebViews(); InvalidateRect(m_hWnd, nullptr, FALSE); }
         if (a == L"fingerprint" || a == L"fp_a11y" || a == L"tz_utc") for (auto& tb : m_tabs) InstallFpScript(tb.get());
         if (a == L"agent_on" && val != L"1") { AgStop(L"Agent is off."); if (AgDockIdx() >= 0) ToggleAgent(); }   // off = stopped and closed
         if (a == L"agent_btn") { if (m_hBtnAgent && !m_setup && !m_full) ShowWindow(m_hBtnAgent, AgBtnOn() ? SW_SHOW : SW_HIDE); RECT cr1; GetClientRect(m_hWnd, &cr1); LayoutToolbar(cr1.right); InvalidateRect(m_hWnd, nullptr, FALSE); }
@@ -3291,6 +3350,15 @@ LRESULT CALLBACK BrowserWindow::ShieldProc(HWND h, UINT msg, WPARAM wp, LPARAM l
 #include "Video.inl"
 #include "Fp.inl"
 #include "Agent.inl"
+#include "Sites.inl"
+#include "AppDetect.inl"
+#include "AppInstall.inl"
+int BrowserWindow::TabHpx() const { return m_app ? 0 : MulDiv(Layout::TabBarHeight, m_dpi, 96); }   // an app window has no tab strip
+void BrowserWindow::AppMinimized(bool min) {   // app window: minimised = stops drawing and falls asleep (the background-tab rule, timer 2006), restored = wakes at once
+    if (m_tabs.empty() || !m_tabs[0]->controller) return; Tab* t = m_tabs[0].get();
+    if (min) { t->controller->put_IsVisible(FALSE); if (!t->hiddenSince) t->hiddenSince = GetTickCount(); }
+    else { t->hiddenSince = 0; t->controller->put_IsVisible(TRUE); if (t->suspended) ResumeTab(t); }
+}
 #include "Sponsor.inl"
 #include "Signals.inl"
 #include "Reader.inl"

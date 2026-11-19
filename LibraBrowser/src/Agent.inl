@@ -720,6 +720,7 @@ bool BrowserWindow::AgAllowedHere() const {   // the Assistant lives only beside
     const std::wstring& u = m_tabs[m_activeTab]->url; return u.empty() || u == L"libra://home" || IsHttp(u);
 }
 void BrowserWindow::ApplyDock() {
+    ApplySite();
     int ai = AgDockIdx(); ResizeWebViews();
     if (ai < 0 || ai == m_activeTab) return;
     Tab* a = m_tabs[ai].get();
@@ -729,6 +730,7 @@ void BrowserWindow::ApplyDock() {
 }
 void BrowserWindow::ToggleAgent() {
     if (m_child) return;   // Child Safety: no agent
+    if (m_sitePanel && AgDockIdx() < 0) { int sp = IndexOf(m_sitePanel); if (sp >= 0) CloseTab(sp); }   // one side panel at a time
     int ai = -1; for (int i = 0; i < (int)m_tabs.size(); ++i) if (m_tabs[i]->url == L"libra://agent") ai = i;
     if (ai >= 0 && m_agDock) { AgStop(nullptr); m_agDock = false; CloseTab(ai); ResizeWebViews(); if (m_hBtnAgent) InvalidateRect(m_hBtnAgent, nullptr, FALSE); return; }   // second click closes it
     if (!AgAllowedHere() && ai != m_activeTab) return;   // not from Settings or any other page of Libra: only from the home screen or a web page

@@ -1,6 +1,7 @@
 #include "pch.h"
 #include "BrowserWindow.h"
 #include "Meter.h"
+#include "Apps.h"
 
 #pragma comment(lib, "comctl32.lib")
 #pragma comment(lib, "dwmapi.lib")
@@ -29,13 +30,30 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR lpCmdLine, int nCmdSho
     { PROCESS_MITIGATION_IMAGE_LOAD_POLICY ip{}; ip.NoRemoteImages = 1; ip.NoLowMandatoryLabelImages = 1; ip.PreferSystem32Images = 1; SetProcessMitigationPolicy(ProcessImageLoadPolicy, &ip, sizeof ip); }
     if (HasFlag(lpCmdLine, L"--meter")) return Mt::Run(hInstance);   // Libra Meter: only the meter, no browser engine
     if (HasFlag(lpCmdLine, L"--register-default")) return RegisterAsBrowser() ? 0 : 1;
+    std::wstring appId; for (auto& a : CmdArgs(lpCmdLine)) if (a.rfind(L"--app=", 0) == 0) appId = a.substr(6);
+    const bool hostHidden = HasFlag(lpCmdLine, L"--host-hidden");
+    AppRec app; int appPort = 0;
+    if (!appId.empty()) {   // web-app window: one window per app, attached to the browser's engine (started hidden when the browser is closed)
+        if (!AppIdOk(appId) || !AppFind(appId, app)) return 1;
+        SetCurrentProcessExplicitAppUserModelID((L"Psylinks.Libra.App." + appId).c_str());   // its own taskbar button, with its own icon
+        CreateMutexW(nullptr, TRUE, (L"Local\\LibraApp-" + appId).c_str());
+        if (GetLastError() == ERROR_ALREADY_EXISTS) { if (HWND w = FindWindowW(L"LibraBrowserApp", app.name.c_str())) { ShowWindow(w, SW_RESTORE); SetForegroundWindow(w); } return 0; }
+        HWND host = AppFindHost();
+        if (!host) {
+            wchar_t ex[MAX_PATH]; GetModuleFileNameW(nullptr, ex, MAX_PATH); std::wstring cl = L"\"" + std::wstring(ex) + L"\" --host-hidden"; STARTUPINFOW si{ sizeof(si) }; PROCESS_INFORMATION pi{};
+            if (CreateProcessW(nullptr, cl.data(), nullptr, nullptr, FALSE, 0, nullptr, nullptr, &si, &pi)) { CloseHandle(pi.hThread); CloseHandle(pi.hProcess); }
+            for (int i = 0; i < 200 && !host; ++i) { Sleep(150); host = AppFindHost(); }
+        }
+        if (!host) { MessageBoxW(nullptr, L"Libra Browser could not start its web engine for this app.", L"Libra Browser", MB_ICONERROR); return 1; }
+        appPort = (int)(INT_PTR)GetPropW(host, L"lbport");
+    }
     // Single-instance: bring existing window to front if already running
     HWND existing = nullptr;   // test hook LIBRA_TEST_MULTI: isolated test run beside a real window; a private window is always its own process
-    if (!HasFlag(lpCmdLine, L"--incognito") && !TestEnv(L"LIBRA_TEST_MULTI", nullptr, 0))
+    if (appId.empty() && !HasFlag(lpCmdLine, L"--incognito") && !TestEnv(L"LIBRA_TEST_MULTI", nullptr, 0))
         existing = FindWindowW(L"LibraBrowserWnd", nullptr);   // (private windows use class LibraBrowserWndP)
     if (existing) {
-        ShowWindow(existing, SW_RESTORE);
-        SetForegroundWindow(existing);
+        if (!hostHidden) { ShowWindow(existing, SW_RESTORE);
+        SetForegroundWindow(existing); }
         std::wstring u = UrlArg(lpCmdLine);
         if (!u.empty()) { COPYDATASTRUCT cd{ 1, (DWORD)((u.size() + 1) * 2), (PVOID)u.c_str() }; DWORD_PTR res = 0; SendMessageTimeoutW(existing, WM_COPYDATA, 0, (LPARAM)&cd, SMTO_ABORTIFHUNG | SMTO_NORMAL, 4000, &res); }   // a frozen window must not freeze this launcher too
         return 0;
@@ -57,6 +75,8 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR lpCmdLine, int nCmdSho
     std::wstring startUrl = UrlArg(lpCmdLine);
 
     BrowserWindow browser(hInstance, incognito);
+    if (!appId.empty()) browser.SetApp(app.id, app.name, app.url, appPort);
+    if (hostHidden) browser.SetHostHidden();
     if (!browser.Create(nCmdShow)) {
         MessageBoxW(nullptr, L"Failed to create browser window.", L"Libra Browser", MB_ICONERROR);
         CoUninitialize();
@@ -99,6 +119,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR lpCmdLine, int nCmdSho
         }
     }
 
+    if (!appId.empty()) { HWND h = AppFindHost(); if (h && !IsWindowVisible(h) && !FindWindowW(L"LibraBrowserApp", nullptr)) PostMessageW(h, WM_CLOSE, 0, 0); }   // last app closed and the browser was only started for it: it goes too
     if (hAccel) DestroyAcceleratorTable(hAccel);
     CoUninitialize();
     return (int)msg.wParam;

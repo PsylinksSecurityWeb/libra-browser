@@ -8,6 +8,8 @@
 struct AdPathRule { const wchar_t* host; const wchar_t* path; };   // host "" = any site; path lower-case, a trailing '$' means "the address must end here"
 inline const AdPathRule kAdPathRules[] = {
     { L"adblock-tester.com", L"/banners/" },   // the AdBlock Tester's own banner folder (EasyList carries the same rule)
+    { L"accounts.google.com", L"/gsi/iframe/select" },
+    { L"accounts.google.com", L"/gsi/status" }, { L"accounts.google.com", L"/gsi/fedcm/" },   // the "are you signed in to Google?" check and the browser-built-in One Tap (FedCM): both send your Google session from the embedding site   // Google One Tap prompt: sends your Google login cookie to Google from every site that embeds it (the real Sign in button, /gsi/button, stays)
     { L"", L".swf$" },                         // Flash is dead and the engine cannot run it: such a file is only ever an empty box
     { L"", L"/ads/banners/" }, { L"", L"/ads/images/" }, { L"", L"/ads/image/" }, { L"", L"/ads/img/" },
     { L"", L"/adbanner." }, { L"", L"/adbanners/" }, { L"", L"/ad_banner." }, { L"", L"/ad-banner." },

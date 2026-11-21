@@ -198,6 +198,13 @@ void BrowserWindow::AttachContextSave(Tab* t) {   // right-click: one clear "Sav
                         [this, t, lk](ICoreWebView2ContextMenuItem*, IUnknown*) -> HRESULT { if (IndexOf(t) >= 0) OpenTab(lk, false, true); return S_OK; }).Get(), &tk3);
                     items->InsertValueAtIndex(0, ot.get());
                 }
+                wil::com_ptr<ICoreWebView2ContextMenuItem> op;   // private window: the one that is already open is reused
+                if (!m_incognito && !m_child && SUCCEEDED(e9->CreateContextMenuItem(L"Open link in private window", nullptr, COREWEBVIEW2_CONTEXT_MENU_ITEM_KIND_COMMAND, &op)) && op) {
+                    EventRegistrationToken tk4; std::wstring lk = link.get();
+                    op->add_CustomItemSelected(Microsoft::WRL::Callback<ICoreWebView2CustomItemSelectedEventHandler>(
+                        [this, t, lk](ICoreWebView2ContextMenuItem*, IUnknown*) -> HRESULT { if (IndexOf(t) >= 0) OpenLinkPrivate(lk); return S_OK; }).Get(), &tk4);
+                    UINT cnt = 0; items->get_Count(&cnt); items->InsertValueAtIndex(cnt > 0 ? 1 : 0, op.get());
+                }
             }
             if (label.empty() || (!video && !IsHttp(url))) return S_OK;   // blob:/data: sources keep the default menu
             wil::com_ptr<ICoreWebView2ContextMenuItem> it;

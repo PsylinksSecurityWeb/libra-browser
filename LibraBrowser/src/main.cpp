@@ -73,17 +73,25 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR lpCmdLine, int nCmdSho
     DWORD safeN = 0;   // Child Safety record present: a private window is never opened (a normal window opens instead)
     if (incognito && RegGetValueW(HKEY_CURRENT_USER, L"Software\\Psylinks\\Libra", L"Safety", RRF_RT_REG_BINARY, nullptr, nullptr, &safeN) == ERROR_SUCCESS) incognito = false;
     std::wstring startUrl = UrlArg(lpCmdLine);
+    if (incognito && !startUrl.empty() && appId.empty()) {   // a link for a private window: reuse the one that is open (new tab there), start a window only when there is none
+        if (HWND pw = AppFindPrivate()) {
+            AllowSetForegroundWindow(ASFW_ANY); if (IsIconic(pw)) ShowWindow(pw, SW_RESTORE);
+            COPYDATASTRUCT cd{ 1, (DWORD)((startUrl.size() + 1) * 2), (PVOID)startUrl.c_str() }; DWORD_PTR res = 0;
+            if (SendMessageTimeoutW(pw, WM_COPYDATA, 0, (LPARAM)&cd, SMTO_ABORTIFHUNG | SMTO_NORMAL, 4000, &res)) return 0;
+        }
+    }
 
     BrowserWindow browser(hInstance, incognito);
     if (!appId.empty()) browser.SetApp(app.id, app.name, app.url, appPort);
     if (hostHidden) browser.SetHostHidden();
+    if (incognito && !startUrl.empty()) browser.SetStartUrl(startUrl);   // must be set before Create: the engine can be ready inside it
     if (!browser.Create(nCmdShow)) {
         MessageBoxW(nullptr, L"Failed to create browser window.", L"Libra Browser", MB_ICONERROR);
         CoUninitialize();
         return 1;
     }
 
-    if (!startUrl.empty()) browser.OpenTab(startUrl);
+    if (!startUrl.empty() && !incognito) browser.OpenTab(startUrl);
 
     // Standard Win32 message pump with accelerators
     HACCEL hAccel = nullptr;

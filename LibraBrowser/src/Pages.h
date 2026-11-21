@@ -193,6 +193,8 @@ inline std::wstring SettingsPage(const Settings& s, bool grey, const std::wstrin
         + row(L"Default blocking level", L"For sites you have not set yourself (shield button)", L"<select data-k=block_default>" + opt(L"0", L"Max: block all", bd) + opt(L"1", L"Balanced: some ads", bd) + opt(L"2", L"Off", bd) + L"</select>")
         + ToggleOn(s, L"https_upgrade", L"Upgrade to HTTPS", L"Open the secure version of a site when there is one")
         + ToggleOn(s, L"fingerprint", L"Fingerprint protection", L"Tiny random changes to what sites can read from your device")
+        + ToggleOn(s, L"ck_sweep", L"Remove other sites' cookies", L"Cookies that ad networks and other third parties set are deleted when you open another site, so they cannot follow you. Sign-in, CAPTCHA and payment sites keep working")
+        + row(L"Your own filter list", L"Optional: the path of a list file in the common Adblock format (.txt, up to 5 MB). Rules for ads on a site's own server. Restart to apply", txt(L"filter_list", L"C:\\path\\list.txt"))
         + Toggle(s, L"block_3p", L"Block third-party cookies", L"Off by default: can break some CAPTCHAs and sign-ins. Restart to apply")
         + ToggleOn(s, L"fp_a11y", L"Hide accessibility preferences", L"Sites cannot read your contrast and motion settings (Max level)")
         + Toggle(s, L"tz_utc", L"Hide my time zone", L"Sites see UTC. Times on booking sites will show in UTC")
@@ -234,7 +236,7 @@ inline std::wstring SettingsPage(const Settings& s, bool grey, const std::wstrin
     b += sec(L"s-fam", L"Family", row(L"Child Safety mode", std::wstring(cs ? L"On. Adult, malware and scam sites are blocked. Turning it off needs your Windows password" : L"Blocks adult, malware and scam sites. Needs your Windows password")
         + (s.Get(L"child_nolock", L"0") == L"1" ? L" Your Windows account has no password, so anyone can turn this off." : L""), std::wstring(L"<button data-c=family.toggle>") + (cs ? L"Turn off" : L"Turn on") + L"</button>"));
     // About
-    b += sec(L"s-about", L"About", row(L"Libra Browser", L"Version 3.9.8 (beta). Secure, private and lightweight. Built by Psylinks Security Private Limited", L"")
+    b += sec(L"s-about", L"About", row(L"Libra Browser", L"Version 3.9.16 (beta). Secure, private and lightweight. Built by Psylinks Security Private Limited", L"")
         + info(L"What Libra does", L"Blocks ads and trackers before they load. Upgrades sites to secure https. Blocks popups and downloads you did not ask for. Hides your browser fingerprint. Keeps a password vault and generator. Fast multi-connection downloads. Private windows that leave nothing behind. Light on memory and CPU. We collect nothing about you. The new-tab page shows clearly labelled sponsored items that support Libra. Anonymous counts can be switched off on the Privacy page.")
         + info(L"License", L"Source available: you can read the code. You may not change, share or sell it without written permission from Psylinks Security Private Limited. See the LICENSE file.")
         + row(L"Source code", L"<a href=\"https://github.com/PsylinksSecurityWeb/libra-browser\" style=\"color:inherit\">github.com/PsylinksSecurityWeb/libra-browser</a>", L""));

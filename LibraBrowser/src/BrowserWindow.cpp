@@ -252,6 +252,7 @@ BrowserWindow::BrowserWindow(HINSTANCE hInst, bool incognito)
     m_adBlocker.LoadDefaults();   // loaded but unused unless the user switches "Local ad blocker" on
     LoadSites();
     LoadData();
+    LoadFilters();
 }
 
 BrowserWindow::~BrowserWindow() {
@@ -316,6 +317,7 @@ bool BrowserWindow::Create(int nCmdShow) {
         if (big) SendMessageW(m_hWnd, WM_SETICON, ICON_BIG, (LPARAM)big); if (sm) SendMessageW(m_hWnd, WM_SETICON, ICON_SMALL, (LPARAM)sm);
     }
     AppWindowProps();
+    if (m_incognito) SetPropW(m_hWnd, L"lbdir", AppDirTag());   // a link for a private window finds this one
     // Enable DWM rounded corner on Win11
     DWM_WINDOW_CORNER_PREFERENCE pref = DWMWCP_ROUND;
     DwmSetWindowAttribute(m_hWnd, DWMWA_WINDOW_CORNER_PREFERENCE, &pref, sizeof(pref));
@@ -535,8 +537,9 @@ void BrowserWindow::DrawNavButton(const DRAWITEMSTRUCT* dis) {
     FillRect(hdc, &rc, bg);
     DeleteObject(bg);
 
-    bool pressed = (dis->itemState & ODS_SELECTED) != 0;
-    bool hover   = (dis->hwndItem == m_hoverBtn);
+    const bool off = (dis->itemState & ODS_DISABLED) != 0;   // Back / Forward with nowhere to go
+    bool pressed = !off && (dis->itemState & ODS_SELECTED) != 0;
+    bool hover   = !off && (dis->hwndItem == m_hoverBtn);
     int  cx = (rc.left + rc.right) / 2, cy = (rc.top + rc.bottom) / 2;
     int  rad = std::min(rc.right - rc.left, rc.bottom - rc.top) / 2 - MulDiv(2, m_dpi, 96);
     if (pressed)      FillCircle(hdc, cx, cy, rad, Color::ButtonPress);
@@ -556,7 +559,7 @@ void BrowserWindow::DrawNavButton(const DRAWITEMSTRUCT* dis) {
         break;
     }
     }
-    COLORREF col = m_incognito ? Color::IncognitoText : ((hover || pressed) ? Color::TextPrimary : Color::TextSecondary);
+    COLORREF col = off ? (m_incognito ? RGB(84, 84, 90) : RGB(201, 201, 205)) : m_incognito ? Color::IncognitoText : ((hover || pressed) ? Color::TextPrimary : Color::TextSecondary);
     DrawGlyph(hdc, glyph, rc, MulDiv(16, m_dpi, 96), col);
 }
 
@@ -607,6 +610,7 @@ void BrowserWindow::InitWebView2(int tabIndex) {
                 }
 
                 {   // pages follow "light" even if Windows is in dark mode
+                    CkInit(t->webView.get());   // cookies that exist now are yours
                     wil::com_ptr<ICoreWebView2_13> w13;
                     wil::com_ptr<ICoreWebView2Profile> prof;
                     if (SUCCEEDED(t->webView->QueryInterface(IID_PPV_ARGS(&w13))) && SUCCEEDED(w13->get_Profile(&prof)))
@@ -671,7 +675,8 @@ void BrowserWindow::InitWebView2(int tabIndex) {
                 static const wchar_t* bait[] = { L"*/ads.js*", L"*/pagead.js*", L"*/adsbygoogle.js*", L"*/show_ads.js*", L"*/show_ads_impl.js*", L"*/adsense.js*" };
                 if (m_adBlock || m_imagesOff) t->webView->AddWebResourceRequestedFilter(L"*", COREWEBVIEW2_WEB_RESOURCE_CONTEXT_ALL);   // otherwise every request would pay a UI-thread round trip for nothing
                 else for (auto b : bait) t->webView->AddWebResourceRequestedFilter(b, COREWEBVIEW2_WEB_RESOURCE_CONTEXT_SCRIPT);
-                for (auto& f : AdRuleFilters()) t->webView->AddWebResourceRequestedFilter(f.c_str(), COREWEBVIEW2_WEB_RESOURCE_CONTEXT_ALL);   // path rules (AdRules.h): only matching addresses reach the handler
+                for (auto& f : AdRuleFilters()) t->webView->AddWebResourceRequestedFilter(f.c_str(), COREWEBVIEW2_WEB_RESOURCE_CONTEXT_ALL);
+                if (!m_flt.Empty()) for (auto cx : { COREWEBVIEW2_WEB_RESOURCE_CONTEXT_IMAGE, COREWEBVIEW2_WEB_RESOURCE_CONTEXT_SCRIPT, COREWEBVIEW2_WEB_RESOURCE_CONTEXT_XML_HTTP_REQUEST, COREWEBVIEW2_WEB_RESOURCE_CONTEXT_FETCH, COREWEBVIEW2_WEB_RESOURCE_CONTEXT_STYLESHEET, COREWEBVIEW2_WEB_RESOURCE_CONTEXT_MEDIA, COREWEBVIEW2_WEB_RESOURCE_CONTEXT_OTHER }) { static std::vector<std::wstring> pf; static size_t pfN = (size_t)-1; if (pfN != m_flt.Count()) { pf = m_flt.Prefilters(); pfN = m_flt.Count(); } if (pf.empty()) t->webView->AddWebResourceRequestedFilter(L"*", cx); else for (auto& f : pf) t->webView->AddWebResourceRequestedFilter(f.c_str(), cx); }   // filter rules (Filters.h): indexed, so a request that matches nothing costs a few microseconds   // path rules (AdRules.h): only matching addresses reach the handler
                 t->webView->add_WebResourceRequested(
                     Microsoft::WRL::Callback<ICoreWebView2WebResourceRequestedEventHandler>(
                         [this](ICoreWebView2* wv, ICoreWebView2WebResourceRequestedEventArgs* args) -> HRESULT {
@@ -697,7 +702,7 @@ void BrowserWindow::InitWebView2(int tabIndex) {
                                     return S_OK;
                                 }
                             }
-                            if (uri.get() && (ctx == COREWEBVIEW2_WEB_RESOURCE_CONTEXT_IMAGE || ctx == COREWEBVIEW2_WEB_RESOURCE_CONTEXT_MEDIA || ctx == COREWEBVIEW2_WEB_RESOURCE_CONTEXT_FETCH || ctx == COREWEBVIEW2_WEB_RESOURCE_CONTEXT_XML_HTTP_REQUEST || ctx == COREWEBVIEW2_WEB_RESOURCE_CONTEXT_OTHER)) {   // ads on the site's own server, refused by their address
+                            if (uri.get() && (ctx == COREWEBVIEW2_WEB_RESOURCE_CONTEXT_IMAGE || ctx == COREWEBVIEW2_WEB_RESOURCE_CONTEXT_MEDIA || ctx == COREWEBVIEW2_WEB_RESOURCE_CONTEXT_FETCH || ctx == COREWEBVIEW2_WEB_RESOURCE_CONTEXT_XML_HTTP_REQUEST || ctx == COREWEBVIEW2_WEB_RESOURCE_CONTEXT_OTHER || (ctx == COREWEBVIEW2_WEB_RESOURCE_CONTEXT_DOCUMENT && wcsstr(uri.get(), L"/gsi/iframe/select")))) {   // ads on the site's own server, refused by their address (and the Google One Tap frame)
                                 std::wstring rh, rp; AdSplitUrl(uri.get(), rh, rp);
                                 if (!rh.empty() && AdPathHit(rh, rp)) {
                                     wil::unique_cotaskmem_string src; wv->get_Source(&src);
@@ -710,6 +715,16 @@ void BrowserWindow::InitWebView2(int tabIndex) {
                                         if (m_activeTab >= 0 && m_activeTab < (int)m_tabs.size() && IsHttp(m_tabs[m_activeTab]->url) && !DohProxy::AdLike(ToUtf8(rh))) ++m_tabs[m_activeTab]->blockedAds;   // counted as an ad, not a tracker
                                         return S_OK;
                                     }
+                                }
+                            }
+                            if (uri.get() && !m_flt.Empty()) {   // filter rules for ads on a site's own server (Max only)
+                                wil::unique_cotaskmem_string src; wv->get_Source(&src);
+                                if (src.get() && IsHttp(src.get()) && ModeFor(HostOf(src.get())) == 0 && FilterBlocks(uri.get(), src.get(), (int)ctx)) {
+                                    wil::com_ptr<ICoreWebView2WebResourceResponse> resp; m_env->CreateWebResourceResponse(nullptr, 404, L"Blocked", L"", &resp); args->put_Response(resp.get());
+                                    std::wstring rh, rp; AdSplitUrl(uri.get(), rh, rp); if (!rh.empty()) OnBlockedHit(ToUtf8(rh));
+                                    AdTestLog(uri.get());   // tests only
+                                    if (m_activeTab >= 0 && m_activeTab < (int)m_tabs.size() && IsHttp(m_tabs[m_activeTab]->url)) ++m_tabs[m_activeTab]->blockedAds;
+                                    return S_OK;
                                 }
                             }
                             // Image blocking
@@ -731,6 +746,8 @@ void BrowserWindow::InitWebView2(int tabIndex) {
                 }
 
                 // ─ Navigation started ────────────────────────────────────
+                { EventRegistrationToken hk; t->webView->add_HistoryChanged(Microsoft::WRL::Callback<ICoreWebView2HistoryChangedEventHandler>(   // back/forward availability changes without a full load (links within a page, single-page sites)
+                    [this, t](ICoreWebView2*, IUnknown*) -> HRESULT { if (IndexOf(t) >= 0) NavRefresh(t); return S_OK; }).Get(), &hk); }
                 t->webView->add_NavigationStarting(
                     Microsoft::WRL::Callback<ICoreWebView2NavigationStartingEventHandler>(
                         [this, t](ICoreWebView2* wv, ICoreWebView2NavigationStartingEventArgs* args) -> HRESULT {
@@ -749,6 +766,7 @@ void BrowserWindow::InitWebView2(int tabIndex) {
                                 if (sch == L"file" && m_pdfAllow.count(lw)) sch = L"";   // a downloaded PDF the user chose to read: the engine's own PDF viewer shows it
                                 for (auto b : bad) if (sch == b) { args->put_Cancel(TRUE); t2->loading = false; return S_OK; }
                             }
+                            if (uri.get() && IsHttp(uri.get()) && CkOn()) { std::wstring nh = HostOf(uri.get()); bool leaving = !nh.empty() && RegDom(HostOf(t2->url)) != RegDom(nh); CkSeen(uri.get()); if (leaving) CkSweep(wv, uri.get(), false); }   // leaving a site: its third-party cookies go before the next page loads
                             if (m_app && uri.get() && IsHttp(uri.get()) && !AppInScope(uri.get())) { args->put_Cancel(TRUE); t2->loading = false; AppToBrowser(uri.get()); return S_OK; }   // an app stays on its own site: other sites open in the browser
                             if (uri.get() && m_set.Get(L"https_upgrade", L"1") != L"0" && CanUpgradeToHttps(uri.get())) {   // http -> https first
                                 std::wstring host = HostOf(uri.get()); DWORD now = GetTickCount();
@@ -783,11 +801,7 @@ void BrowserWindow::InitWebView2(int tabIndex) {
                             t2->loading  = false;
                             t2->progress = 1.0f;
                             if (!m_incognito && !m_setup && !m_set.On(L"first_block_shown")) SetTimer(m_hWnd, 2004, 2800, nullptr);   // maybe celebrate the first blocked ads
-                            BOOL canBack = FALSE, canFwd = FALSE;
-                            wv->get_CanGoBack(&canBack);
-                            wv->get_CanGoForward(&canFwd);
-                            t2->canBack = !!canBack;
-                            t2->canFwd  = !!canFwd;
+                            NavRefresh(t2);   // Back / Forward availability (the new-tab page does not count as somewhere to go back to)
                             wil::unique_cotaskmem_string uri;
                             wv->get_Source(&uri);
                             BOOL navOk = FALSE; args->get_IsSuccess(&navOk);
@@ -843,7 +857,7 @@ void BrowserWindow::InitWebView2(int tabIndex) {
                             wil::unique_cotaskmem_string uri;
                             args->get_Uri(&uri);
                             if (!uri.get() || !IsHttp(uri.get())) return S_OK;   // a website may open websites only, never libra:// pages, file:, data: or javascript:
-                            OpenTab(uri.get());
+                            if (m_agRun) m_agNewWin = true; OpenTab(uri.get());
                             return S_OK;
                         }).Get(), &t->tokNewWindow);
                 AgTrackFrames(t);
@@ -1149,6 +1163,7 @@ void BrowserWindow::OpenTab(const std::wstring& url, bool incognito, bool backgr
     }
 
     if (m_envReady) InitWebView2(idx);
+    UpdateNavButtons();
     InvalidateRect(m_hWnd, nullptr, FALSE);
     RefreshTabsPage();
 }
@@ -1295,8 +1310,22 @@ void BrowserWindow::UpdateOmniboxText(const std::wstring& url) {
     UpdateBypass(); if (m_hBtnShield) InvalidateRect(m_hBtnShield, nullptr, FALSE);
 }
 
-void BrowserWindow::UpdateNavButtons() {
+void BrowserWindow::NavRefresh(Tab* t) {   // Forward = the engine says so. Back = an earlier entry that is a real page: our own pages (new tab, settings...) are data: addresses and are not counted
+    if (!t || !t->webView) return;
+    BOOL b = FALSE, f = FALSE; t->webView->get_CanGoBack(&b); t->webView->get_CanGoForward(&f); t->canFwd = !!f;
+    if (!b) { t->canBack = false; if (IndexOf(t) == m_activeTab) UpdateNavButtons(); return; }
+    t->webView->CallDevToolsProtocolMethod(L"Page.getNavigationHistory", L"{}", Microsoft::WRL::Callback<ICoreWebView2CallDevToolsProtocolMethodCompletedHandler>([this, t](HRESULT hr, LPCWSTR json) -> HRESULT {
+        int i = IndexOf(t); if (i < 0) return S_OK; bool back = true;   // no usable answer: trust the engine
+        if (SUCCEEDED(hr) && json) { std::wstring s = json; size_t p = s.find(L"\"currentIndex\":"); int cur = p == std::wstring::npos ? -1 : _wtoi(s.c_str() + p + 15);
+            if (cur > 0) { std::vector<std::wstring> urls; for (size_t q = 0; (q = s.find(L"\"url\":\"", q)) != std::wstring::npos;) { q += 7; size_t e = s.find(L'"', q); if (e == std::wstring::npos) break; urls.push_back(s.substr(q, e - q)); q = e; }
+                if ((int)urls.size() >= cur) { back = false; for (int k = 0; k < cur; ++k) if (urls[k].rfind(L"data:", 0) != 0 && urls[k].rfind(L"about:blank", 0) != 0) back = true; } } }
+        t->canBack = back; if (i == m_activeTab) UpdateNavButtons(); return S_OK; }).Get());
+}
+void BrowserWindow::UpdateNavButtons() {   // Back / Forward are dimmed and dead while there is nothing to go back or forward to
     if (m_activeTab < 0 || m_activeTab >= (int)m_tabs.size()) return;
+    const Tab* t = m_tabs[m_activeTab].get();
+    if (m_hBtnBack && (IsWindowEnabled(m_hBtnBack) != FALSE) != t->canBack) EnableWindow(m_hBtnBack, t->canBack ? TRUE : FALSE);
+    if (m_hBtnFwd && (IsWindowEnabled(m_hBtnFwd) != FALSE) != t->canFwd) EnableWindow(m_hBtnFwd, t->canFwd ? TRUE : FALSE);
 }
 
 void BrowserWindow::SetAdBlockEnabled(bool enabled) {
@@ -1758,7 +1787,8 @@ LRESULT CALLBACK BrowserWindow::WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPAR
         auto* cd = reinterpret_cast<COPYDATASTRUCT*>(lParam);
         if (cd && cd->dwData == 1 && cd->cbData >= 2 && cd->cbData < 4100) {
             std::wstring u((const wchar_t*)cd->lpData, cd->cbData / 2); while (!u.empty() && !u.back()) u.pop_back();
-            if (IsHttp(u)) { if (IsIconic(hWnd)) ShowWindow(hWnd, SW_RESTORE); bw->OpenTab(u); SetForegroundWindow(hWnd); }
+            if (IsHttp(u)) { if (IsIconic(hWnd)) ShowWindow(hWnd, SW_RESTORE); bw->OpenTab(u); SetForegroundWindow(hWnd);
+                if (bw->m_incognito) { wchar_t pf[MAX_PATH]; if (TestEnv(L"LIBRA_TEST_PRIVLOG", pf, MAX_PATH) > 0) WriteAllRaw(pf, "open " + ToUtf8(u) + "\n", true); } }
         }
         return TRUE;
     }
@@ -1945,6 +1975,9 @@ void BrowserWindow::OnTimer(UINT_PTR id) {
     if (id == 2003) { PwClipClear(); return; }
     if (id == 2004) { KillTimer(m_hWnd, 2004); FirstBlock(); return; }
     if (id == 2080) { KillTimer(m_hWnd, 2080); AppDetectRun(); return; }
+    if (id == 2084 || id == 2085) { KillTimer(m_hWnd, id); wchar_t pl[700]; if (TestEnv(L"LIBRA_TEST_PRIVLINK", pl, 700) > 0) { std::wstring v = pl; size_t sp = v.find(L' '); OpenLinkPrivate(id == 2084 ? v.substr(0, sp) : (sp == std::wstring::npos ? L"" : v.substr(sp + 1))); if (id == 2084) SetTimer(m_hWnd, 2085, 6000, nullptr); } return; }
+    if (id == 2082) { CkSweepActive(false); return; }
+    if (id == 2083) { KillTimer(m_hWnd, 2083); CkSweepActive(false); return; }
     if (id == 2081) { KillTimer(m_hWnd, 2081); wchar_t ti[8]; TestEnv(L"LIBRA_TEST_APPINSTALL", ti, 8); AppInstallAsk(ti[0] == L'm'); return; }
     if (id == 2005) { DlPush(); return; }
     if (id == 2031) {   // a new local day: every tab gets the new identity script
@@ -1973,6 +2006,8 @@ void BrowserWindow::OnTimer(UINT_PTR id) {
     if (id == 2020) { KillTimer(m_hWnd, 2020); AgGoNow(); return; }
     if (id == 2021) { KillTimer(m_hWnd, 2021); AgClickNow(); return; }
     if (id == 2022) { KillTimer(m_hWnd, 2022); AgClickCheck(); return; }
+    if (id == 2023) { KillTimer(m_hWnd, 2023); AgPickCheck(); return; }
+    if (id == 2024) { KillTimer(m_hWnd, 2024); AgDragCheck(); return; }
     if (id != TIMER_PROGRESS) return;
 
     // Hover tracking for the owner-draw toolbar buttons
@@ -2077,7 +2112,9 @@ void BrowserWindow::SaveState() {
     SaveSession();
 }
 void BrowserWindow::OnClose() {
+    if (m_closing) return; m_closing = true;
     SaveState();
+    if (CkOn()) { CkWait(1200); CkSweepActive(true); CkWait(1500); }   // last sweep (also analytics IDs) reaches the engine before it shuts down
     for (auto& tab : m_tabs) {
         if (tab->webView) {
             tab->webView->remove_NavigationStarting(tab->tokNavStart);
@@ -2141,6 +2178,14 @@ void BrowserWindow::NewPrivateWindow() {   // like other browsers: a separate da
     if (CreateProcessW(nullptr, cmd.data(), nullptr, nullptr, FALSE, 0, nullptr, nullptr, &si, &pi)) { CloseHandle(pi.hThread); CloseHandle(pi.hProcess); }
 }
 
+
+void BrowserWindow::OpenLinkPrivate(const std::wstring& url0) {   // "Open link in private window": the open private window gets a new tab; only when there is none, one is started (main.cpp does the hand-over)
+    if (m_child || m_incognito || !IsHttp(url0) || url0.size() > 2000) return;
+    std::wstring url; for (wchar_t ch : url0) { if (ch == L'"') url += L"%22"; else if (ch >= 32) url += ch; }
+    AllowSetForegroundWindow(ASFW_ANY);   // the private window may come to the front
+    wchar_t exe[MAX_PATH]; GetModuleFileNameW(nullptr, exe, MAX_PATH); std::wstring cmd = L"\"" + std::wstring(exe) + L"\" --incognito \"" + url + L"\"";
+    STARTUPINFOW si{ sizeof(si) }; PROCESS_INFORMATION pi{}; if (CreateProcessW(nullptr, cmd.data(), nullptr, nullptr, FALSE, 0, nullptr, nullptr, &si, &pi)) { CloseHandle(pi.hThread); CloseHandle(pi.hProcess); }
+}
 
 // === Phase 1: data, internal pages, downloads, shortcuts ==============================
 void BrowserWindow::LoadData() {
@@ -2269,6 +2314,8 @@ void BrowserWindow::StartupTabs() {
     { wchar_t rv[8]; if (TestEnv(L"LIBRA_TEST_READER", rv, 8)) SetTimer(m_hWnd, 2073, 12000, nullptr); }
     SetTimer(m_hWnd, 2031, 300000, nullptr);   // new day -> new fingerprint identity
     SetTimer(m_hWnd, 2006, 4000, nullptr);   // background tabs keep a small memory footprint
+    SetTimer(m_hWnd, 2082, 300000, nullptr);   // third-party cookie sweep for pages that stay open
+    { wchar_t pl[700]; if (!m_incognito && TestEnv(L"LIBRA_TEST_PRIVLINK", pl, 700) > 0) SetTimer(m_hWnd, 2084, 8000, nullptr); }   // test hook only: two links "u1 u2" to private windows
     if (m_app) { OpenTab(m_appUrl); ResizeWebViews(); return; }   // app window: its page only (no session, pinned tabs, sponsored feed or update check)
     UpLoad(); SponsorLoad(); { wchar_t sf[8]; SetTimer(m_hWnd, 2040, TestEnv(L"LIBRA_TEST_SPFEED", sf, 8) ? 1500 : 30000, nullptr); }   // sponsored feed: cached copy now, a daily fetch soon after start
     int np = 0;
@@ -2276,6 +2323,7 @@ void BrowserWindow::StartupTabs() {
         for (auto& u : Lines(ReadAll(DataDir() + L"\\pinned.txt")))
             if (IsHttp(u) && np < 12) { OpenTab(u); m_tabs.back()->pinned = true; m_tabs.back()->lazy = true; ++np; }
     if (!m_set.On(L"welcomed")) { m_setup = true; for (HWND w : { m_hOmnibox, m_hBtnBack, m_hBtnFwd, m_hBtnRefresh, m_hBtnShield, m_hBtnAgent, m_hBtnShot, m_hBtnMenu }) ShowWindow(w, SW_HIDE); OpenTab(L"libra://welcome"); ResizeWebViews(); return; }
+    if (m_incognito && IsHttp(m_startUrl)) { OpenTab(m_startUrl); ResizeWebViews(); { wchar_t pf[MAX_PATH]; if (TestEnv(L"LIBRA_TEST_PRIVLOG", pf, MAX_PATH) > 0) WriteAllRaw(pf, "open " + ToUtf8(m_startUrl) + "\n", true); } return; }   // opened for a link: that page is the first tab
     std::wstring st = m_set.Get(L"startup", L"home"), hp = m_set.Get(L"homepage");
     if (st == L"url" && IsHttp(hp)) { OpenTab(hp); return; }
     if (st == L"last" && !m_incognito) {
@@ -2528,7 +2576,7 @@ void BrowserWindow::OnPageMessage(int idx, const std::wstring& msg) {
     if (c == L"family.toggle") { AskWindows(m_child ? 2 : 1); return; }
     if (c == L"family.unlock") { if (m_child && idx == m_activeTab) { m_authHost = HostOf(m_tabs[idx]->errUrl); AskWindows(4); } return; }
     if (c == L"set") {
-        static const wchar_t* keys[] = { L"accent", L"meter_on", L"meter_start", L"meter_size", L"meter_top", L"meter_dock", L"meter_opacity", L"block_recall", L"history_keep", L"engine", L"engine_url", L"startup", L"homepage", L"dl_ask", L"dl_dir", L"clear_start", L"local_block", L"block_images", L"perm_allow", L"smartscreen_off", L"perf", L"block_default", L"save_video", L"https_upgrade", L"fingerprint", L"block_3p", L"fp_a11y", L"tz_utc", L"keep_signin", L"agent_on", L"agent_btn", L"agent_opt", L"agent_vauto", L"sponsored", L"sn_count", L"autosuggest", L"site_dock", L"site_list" };
+        static const wchar_t* keys[] = { L"accent", L"meter_on", L"meter_start", L"meter_size", L"meter_top", L"meter_dock", L"meter_opacity", L"block_recall", L"history_keep", L"engine", L"engine_url", L"startup", L"homepage", L"dl_ask", L"dl_dir", L"clear_start", L"local_block", L"block_images", L"perm_allow", L"smartscreen_off", L"perf", L"block_default", L"save_video", L"https_upgrade", L"fingerprint", L"block_3p", L"ck_sweep", L"filter_list", L"fp_a11y", L"tz_utc", L"keep_signin", L"agent_on", L"agent_btn", L"agent_opt", L"agent_vauto", L"sponsored", L"sn_count", L"autosuggest", L"site_dock", L"site_list" };
         if (std::none_of(std::begin(keys), std::end(keys), [&](const wchar_t* k) { return a == k; })) return;
         if (val.size() > 500) return;
         if (a == L"engine") {
@@ -2992,6 +3040,7 @@ var th=location.hostname;try{if(window.top!==window&&location.ancestorOrigins&&l
 function mt(L){for(var i=0;i<L.length;i++)if(th===L[i]||th.endsWith('.'+L[i]))return true;return false}
 var MODE=mt(ML)?0:mt(BL)?1:mt(AL)?2:DEF;if(MODE===2)return;var BAL=(MODE===1);
 if(MODE===0){try{var cs=new CSSStyleSheet();cs.replaceSync('ins.adsbygoogle,.adsbygoogle,[id^="google_ads_iframe"],[id^="div-gpt-ad"],[data-ad-slot],[data-google-query-id],iframe[src*="doubleclick.net"],iframe[src*="googlesyndication.com"],iframe[src*="adservice.google"],.adsbox,.ad-box,.ad-banner,.ad_banner,.banner_ad,.bannerAd,.ad-unit,.ad_unit,.ad-slot,.ad-placeholder,.ad-container,.ad-wrapper,.advertisement,.text-ad,.textAd,.text_ad,.text_ads,.pub_300x250,.pub_300x250m,.pub_728x90,#ad-banner,#ad_banner,#adbanner,#ad-slot{display:none!important}');document.adoptedStyleSheets=[].concat(document.adoptedStyleSheets||[],[cs])}catch(e){}}   /* cosmetic ad boxes: Max only, our own short list of common ad container names; Balanced keeps the ads it lets through */
+)js" + FilterJs() + LR"js(
 (function(){function ua(){return navigator.userActivation&&navigator.userActivation.isActive}
 var HP=0,HX=0,HY=0;['pointermove','pointerover','mouseover','mousemove'].forEach(function(n){document.addEventListener(n,function(e){if(e.isTrusted){HP=Date.now();HX=e.clientX;HY=e.clientY}},true)});
 function hov(el){if(!el.muted||Date.now()-HP>2500)return false;var a=el,vw=innerWidth*innerHeight;for(var i=0;i<5&&a&&a!==document.body;i++,a=a.parentElement){var r=a.getBoundingClientRect();if(r.width*r.height>vw*.5)break;if(HX>=r.left&&HX<=r.right&&HY>=r.top&&HY<=r.bottom)return true}return false}
@@ -3353,6 +3402,8 @@ LRESULT CALLBACK BrowserWindow::ShieldProc(HWND h, UINT msg, WPARAM wp, LPARAM l
 #include "Sites.inl"
 #include "AppDetect.inl"
 #include "AppInstall.inl"
+#include "CookieSweep.inl"
+#include "FilterRun.inl"
 int BrowserWindow::TabHpx() const { return m_app ? 0 : MulDiv(Layout::TabBarHeight, m_dpi, 96); }   // an app window has no tab strip
 void BrowserWindow::AppMinimized(bool min) {   // app window: minimised = stops drawing and falls asleep (the background-tab rule, timer 2006), restored = wakes at once
     if (m_tabs.empty() || !m_tabs[0]->controller) return; Tab* t = m_tabs[0].get();

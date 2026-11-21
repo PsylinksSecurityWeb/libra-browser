@@ -3,7 +3,7 @@
 #pragma once
 #include "Sponsor.h"
 
-constexpr const char* kLibraVer = "3.9.8";   // keep in step with the version in LibraBrowser.rc and Pages.h (About)
+constexpr const char* kLibraVer = "3.9.16";   // keep in step with the version in LibraBrowser.rc and Pages.h (About)
 
 struct UpInfo { long long seq = 0, expires = 0, size = 0; std::string ver, url, sha, notes; };
 

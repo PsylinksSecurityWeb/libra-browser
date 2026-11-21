@@ -1,6 +1,6 @@
-# Libra Browser: product description
+﻿# Libra Browser: product description
 
-**Version 3.9.8 (beta) · Windows 10 and 11 · Free to use · Made by Psylinks Security Private Limited, India**
+**Version 3.9.16 (beta) Â· Windows 10 and 11 Â· Free to use Â· Made by Psylinks Security Private Limited, India**
 
 ---
 
@@ -197,5 +197,5 @@ Psylinks Security Private Limited, an Indian security company, has released Libr
 
 ---
 
-*Libra Browser · Secure, private and lightweight.*
-*Psylinks Security Private Limited, India · Source (view only): https://github.com/PsylinksSecurityWeb/libra-browser*
+*Libra Browser Â· Secure, private and lightweight.*
+*Psylinks Security Private Limited, India Â· Source (view only): https://github.com/PsylinksSecurityWeb/libra-browser*

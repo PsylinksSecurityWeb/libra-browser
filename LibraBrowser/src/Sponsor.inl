@@ -4,7 +4,7 @@
 
 struct SpCfg { std::wstring feed; std::string base; std::vector<SpKeyA> keys; bool test = false; };
 static SpCfg SpConfig() {
-    SpCfg c; c.feed = L"";   // https address of the signed feed
+    SpCfg c; c.feed = L"https://feed.riaa.online/v1/feed";   // https address of the signed feed
     static const SpKeyA owner[2] = { { "k1", "", "" }, { "k2", "", "" } };   // public signing keys (x, y); k2 is a spare for key rotation. Empty = the feature stays off
     for (auto& k : owner) c.keys.push_back(k);
     wchar_t f[512], k[512];

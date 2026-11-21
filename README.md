@@ -1,11 +1,11 @@
-<p align="center"><img src="docs/icon.png" width="120" alt="Libra Browser icon"></p>
+﻿<p align="center"><img src="docs/icon.png" width="120" alt="Libra Browser icon"></p>
 
 <h1 align="center">Libra Browser</h1>
 <p align="center"><b>Libra Browser is a security-focused Windows browser: secure, private and lightweight. It blocks ads and trackers before they ever load.</b><br>
-No account. No sync. No telemetry in Libra Browser's own code. Built by <b>Psylinks Security Private Limited</b>, an Indian company. Version 3.9.8 (beta).</p>
+No account. No sync. No telemetry in Libra Browser's own code. Built by <b>Psylinks Security Private Limited</b>, an Indian company. Version 3.9.16 (beta).</p>
 
 
-<p align="center"><a href="https://github.com/PsylinksSecurityWeb/libra-browser">GitHub</a> · <a href="https://github.com/PsylinksSecurityWeb/libra-browser/issues">Issues</a> · <a href="https://github.com/PsylinksSecurityWeb/libra-browser/security/advisories/new">Report a vulnerability</a></p>
+<p align="center"><a href="https://github.com/PsylinksSecurityWeb/libra-browser">GitHub</a> Â· <a href="https://github.com/PsylinksSecurityWeb/libra-browser/issues">Issues</a> Â· <a href="https://github.com/PsylinksSecurityWeb/libra-browser/security/advisories/new">Report a vulnerability</a></p>
 
 > **Beta:** Libra Browser is still being built. Small errors can happen, and we improve it every day. The AI Agent is a beta feature too, so check its work before you submit anything important.
 >
@@ -14,9 +14,8 @@ No account. No sync. No telemetry in Libra Browser's own code. Built by <b>Psyli
 ## Why Libra Browser
 - **Blocks ads and trackers at the DNS layer.** Every site name is looked up through our own DNS-over-HTTPS server, so trackers are refused *before* a connection exists. Less data, less CPU, faster pages.
 - **Three levels per site:** Off, Balanced, Max, one tap from the shield icon. Fix a broken site without turning protection off everywhere.
-- **Install websites as desktop apps.** Libra Browser can detect eligible HTTPS web apps, ask for your confirmation, then create a dedicated Libra app window with Start-menu and optional Desktop shortcuts. App data stays in your local Libra profile, and links outside the app's site open in the normal browser.
 - **Built for old and small PCs.** One small `.exe` on top of the Edge WebView2 runtime that Windows already uses, tab sleeping, a low-end mode, and a first-run animation that skips itself on weak machines.
-- **Private by design.** No account, no cloud sync, no analytics, no tracking. Your history, bookmarks and passwords never leave the PC. The public 3.9.8 build does not show sponsored content; the signed-feed code is disabled until a publisher-controlled endpoint and public keys are verified.
+- **Private by design.** No account, no cloud sync, no analytics, no tracking. Your history, bookmarks and passwords never leave the PC. The public 3.9.16 build does not show sponsored content; the signed-feed code has no configured public signing key and therefore fetches nothing.
 - **Security defaults that matter:** popups need a real click, downloads started by a page without a click are refused, permissions default to *ask*, motion sensors are always blocked, https upgrade, fingerprint protection, Mark-of-the-Web on downloads.
 - **Clean, flat, calm UI.** White canvas, no shadows, no clutter. Sponsored items are disabled in this public build.
 
@@ -46,17 +45,12 @@ No account. No sync. No telemetry in Libra Browser's own code. Built by <b>Psyli
 ![Settings](docs/screenshots/settings.png)
 ![History](docs/screenshots/history.png)
 
-## New in Libra Browser 3.9.8 beta
+## New in Libra Browser 3.9.16 beta
 
-- **Sidebar sites:** keep up to 24 favourite sites in a local sidebar and open one in a docked panel without leaving the current tab. Favicons are fetched without cookies and cached locally.
-- **Install sites as apps:** install eligible HTTPS web apps after an explicit confirmation. Libra reads the site's web-app manifest, downloads a capped icon without cookies, creates a dedicated Libra window, and offers a Start-menu shortcut plus an optional Desktop shortcut. App records are encrypted locally; app windows keep navigation within the app site and send outside links back to the normal browser.
-- **App privacy controls:** remove installed apps from Settings, delete their shortcuts, and keep sign-in data in the browser profile.
-
-### Web-app installation
-
-When Libra detects an installable HTTPS web app, an install icon appears in the toolbar or sidebar. Choose **Install**, review the site's name and address, and optionally select **Add a shortcut on the Desktop**. Libra creates a separate app window that uses the same local browser profile, so existing sign-ins can continue to work without creating a new account. The app's stored record is protected with Windows DPAPI, and removing the app deletes its Libra-created shortcuts and local app record while leaving the site's normal browser data in place.
-
-App windows are deliberately scoped: navigation belonging to the installed site's domain remains in the app window; links to unrelated sites are sent to a regular Libra Browser window. Installation is unavailable in private windows, Child Safety mode, and other restricted browser states.
+- **Safer cookie sweeping:** optional third-party cookie cleanup removes cross-site tracking cookies while preserving current-site sessions, installed-app domains, and a small sign-in/payment allow-list.
+- **Local filter lists:** Max mode supports a bounded, safe subset of Adblock-style network and cosmetic rules, including an optional user-owned list file. Unsupported procedural and scriptlet rules are ignored.
+- **Signed update checks:** the update path is inert until a publisher configures a public signing key; when enabled, updates require a signed manifest, matching SHA-256, explicit confirmation, and never install silently.
+- **PDF tools, backup/import, reader mode, and signals:** these remain local or user-triggered, with the data-flow limitations documented in [SENDS.md](SENDS.md).
 
 ## Features
 **Protection**
@@ -75,7 +69,7 @@ App windows are deliberately scoped: navigation belonging to the installed site'
 - Password vault (Windows DPAPI) with a strong password generator and tap-to-fill
 - Fast downloads: segmented multi-connection, resume after failure, live speed
 - **AI Agent (beta)**, off by default: bring your own API key; it can fill forms and read pages for you, asks before anything risky, never types passwords or card numbers, never solves CAPTCHAs. See [AGENT.md](AGENT.md)
-- **Sponsored content (disabled in 3.9.8):** the signed-feed implementation is present for future publisher-controlled use, but the public build has no feed address or public key configured. It fetches nothing, shows nothing, and sends no sponsored-content counts. See [SPONSORED.md](SPONSORED.md) and [SENDS.md](SENDS.md).
+- **Sponsored content (disabled in 3.9.16):** the signed-feed implementation is present for future publisher-controlled use, but this public build has no configured signing key. It fetches nothing, shows nothing, and sends no sponsored-content counts. See [SPONSORED.md](SPONSORED.md) and [SENDS.md](SENDS.md).
 - **Auto suggest (optional, no AI, this PC only):** click an empty name, e-mail, phone or company box and Libra offers the matching value from your own saved notes in its own popup; click it to type it. Opens only after a real click or Tab key, never for passwords, user names, cards or ID numbers, never on sign-in forms. See [AGENT.md](AGENT.md)
 - "Clear browsing data": tick boxes and a time range; each kind is cleared and checked, anything left is swept again, and the result shows real numbers or what failed. Your API key, bookmarks and saved logins are never touched
 - "Save videos" helper and right-click save for images, links and PDFs (off by default)

@@ -1,9 +1,9 @@
 # Sponsored content
 
-The sponsored-content implementation is present but disabled in the public 3.9.8 build. It shows no sponsored tiles or background picture and has no network activity until a publisher-controlled feed address and public signing key are verified. Each item can be hidden for 30 days with its Hide button. It is never shown in private windows, with Child Safety on, or during first run. Every item carries the word "Sponsored".
+The sponsored-content implementation is present but disabled in the public 3.9.16 build. It shows no sponsored tiles or background picture and has no sponsored-feed network activity because the public signing keys are empty. Each item can be hidden for 30 days with its Hide button. It is never shown in private windows, with Child Safety on, or during first run. Every item carries the word "Sponsored".
 
 ## What the browser does and does not do
-- In a build with a verified feed configured, it can fetch one signed feed with a plain `GET`, through Libra's own DNS-over-HTTPS proxy. No cookies, no redirects, no identifier, nothing about the user or the pages visited is sent.
+- In a build with verified public keys configured, it can fetch one signed feed with a plain `GET`, through Libra's own DNS-over-HTTPS proxy. No cookies, no redirects, no identifier, nothing about the user or the pages visited is sent.
 - The feed is accepted only if its ECDSA P-256 / SHA-256 signature matches a public key built into the browser, it has not expired and its counter (`seq`) did not go back. Otherwise it is ignored.
 - The browser chooses what to show on the PC (region comes from the Windows region setting and is never sent). The feed is the same file for everybody, so nothing is sent to pick an ad.
 - A tile opens the advertiser's `https` address directly, plus one constant tag `utm_source=libra` that is the same for every user. Nothing goes through our server when you click. The address must be a plain `https` host name: no login part, no port, no odd characters (`SpGoOk` in `Sponsor.h`).

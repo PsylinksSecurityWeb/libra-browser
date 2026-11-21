@@ -82,40 +82,56 @@ static std::string AgPost(int port, const std::wstring& ep, const std::string& k
     return out;
 }
 
+// Shared by the snapshot, the act script and the pre-click re-check (one definition each, no drift).
+// sigOf: what an element looked like in the list; ptOf: a click point that is visible, enabled and not covered, or the reason it is not.
+#define AG_SIG_JS LR"S(var sigOf=function(e){try{return e.tagName+'|'+(e.type||'')+'|'+(e.getAttribute('role')||'')+'|'+String(e.getAttribute('aria-label')||(e.isContentEditable?'':e.innerText)||e.placeholder||e.name||e.id||'').replace(/\s+/g,' ').trim().slice(0,30)}catch(z){return ''}};)S"
+#define AG_PT_JS LR"S(var ptOf=function(e){var r=e.getBoundingClientRect();if(!e.getClientRects().length||r.width<2||r.height<2)return 'it is not visible';
+if(e.disabled||e.getAttribute('aria-disabled')=='true')return 'it is disabled (a required field before it may be empty)';
+var c=[[r.left+Math.min(r.width/2,60),r.top+r.height/2],[r.left+r.width/2,r.top+r.height/2],[r.left+Math.min(6,r.width/2),r.top+r.height/2]],cv='';
+for(var i=0;i<c.length;i++){var x=Math.round(c[i][0]),y=Math.round(c[i][1]);if(x<0||y<0||x>=innerWidth||y>=innerHeight){cv='it is outside the visible window';continue}
+ var t=document.elementFromPoint(x,y);while(t&&t.shadowRoot){var u=t.shadowRoot.elementFromPoint(x,y);if(!u||u===t)break;t=u}
+ if(!t){cv='nothing is at that spot';continue}
+ var lb=t.closest&&t.closest('label');
+ if(t===e||e.contains(t)||t.contains(e)||(lb&&e.labels&&Array.prototype.indexOf.call(e.labels,lb)>=0))return [x,y];
+ cv='another element covers it ('+t.tagName.toLowerCase()+' '+String(t.getAttribute&&t.getAttribute('aria-label')||t.innerText||'').replace(/\s+/g,' ').slice(0,30)+')'}
+return cv||'it is covered'};)S"
 // Runs inside the target tab: visible, interactive elements only (no hidden, off-screen or zero-size nodes).
 static const wchar_t* kAgSnap = LR"H((function(){try{
 var hc=function(){try{var f=document.querySelectorAll('iframe[src*="recaptcha"],iframe[src*="hcaptcha"],iframe[src*="turnstile"],iframe[src*="challenges.cloudflare"],iframe[src*="arkoselabs"],#px-captcha,.g-recaptcha,.h-captcha,.cf-turnstile');for(var i=0;i<f.length;i++){if(f[i].closest('.grecaptcha-badge'))continue;var r=f[i].getBoundingClientRect();if(r.width>40&&r.height>20)return 1}
 if(/just a moment|attention required|access denied|are you a robot/i.test(document.title))return 1;var t=(document.body&&document.body.innerText||'').slice(0,3000);return /not a robot|are you a (person|human)|verify (that )?you are (a )?human|unusual traffic|complete the security check|checking if the site connection is secure|select all (images|squares)|press (&|and) hold|captcha challenge|bots use duckduckgo|pardon our interruption/i.test(t)?1:0}catch(x){return 0}};
 if(hc())return 'HUMAN_CHECK';
-var vis=function(e){var r=e.getBoundingClientRect();if(r.width<4||r.height<4||r.bottom<-200||r.top>innerHeight+400||r.right<-20||r.left>innerWidth+20)return 0;var s=getComputedStyle(e);if(s.visibility!='visible'||s.display=='none'||+s.opacity<.1)return 0;if(e.closest('[aria-hidden=true],[inert],[hidden]'))return 0;return 1};
-var sel='a[href],button,input:not([type=hidden]),select,textarea,label,summary,[role=button],[role=link],[role=tab],[role=menuitem],[role=radio],[role=checkbox],[role=option],[role=combobox],[role=listbox],[role=switch],[role=textbox],[role=treeitem],[contenteditable=true],[aria-haspopup],[tabindex]:not([tabindex="-1"]),[onclick]';
+var vis=function(e){var r=e.getBoundingClientRect();if(r.width<4||r.height<4||r.bottom<-200||r.top>innerHeight+(/^(INPUT|SELECT|TEXTAREA)$/.test(e.tagName)?1600:400)||r.right<-20||r.left>innerWidth+20)return 0;var s=getComputedStyle(e);if(s.visibility!='visible'||s.display=='none'||+s.opacity<.1)return 0;if(e.closest('[aria-hidden=true],[inert],[hidden]'))return 0;return 1};
+)H" AG_SIG_JS LR"H(var sel='a[href],button,input:not([type=hidden]),select,textarea,label,summary,[role=button],[role=link],[role=tab],[role=menuitem],[role=radio],[role=checkbox],[role=option],[role=combobox],[role=listbox],[role=switch],[role=textbox],[role=treeitem],[contenteditable=true],[aria-haspopup],[tabindex]:not([tabindex="-1"]),[onclick],[draggable=true]';
 var q=Array.prototype.slice.call(document.querySelectorAll(sel)),seen=new Set(q),ex=document.querySelectorAll('div,span,li,td'),k=0;
 for(var j=0;j<ex.length&&k<700;j++){var x=ex[j];if(seen.has(x))continue;k++;var it=(x.innerText||'').trim();if(!it||it.length>60||x.children.length>3)continue;
  if(getComputedStyle(x).cursor=='pointer'&&!x.closest('a,button,[role=button],[onclick],label,[role=option]')){q.push(x);seen.add(x)}}
 q.sort(function(a,b){return a===b?0:(a.compareDocumentPosition(b)&4?-1:1)});
 var arr=[],out=[];
 var qf=function(e){try{var s='';if(e.labels&&e.labels[0])s=e.labels[0].innerText;if(!s){var ids=e.getAttribute('aria-labelledby');if(ids)s=ids.split(' ').map(function(i){var n=document.getElementById(i);return n?n.innerText:''}).join(' ')}
-if(!s){var n=e,k=0;while(n&&k<5&&!s){var p=n.previousElementSibling,g=0;while(p&&g<4&&!s){var tt=(p.innerText||'').trim();if(tt&&tt.length<200&&!p.querySelector('input,textarea,select'))s=tt;p=p.previousElementSibling;g++}n=n.parentElement;k++}}
+if(!s){var n=e,k=0;while(n&&k<8&&!s){var p=n.previousElementSibling,g=0;while(p&&g<4&&!s){var tt=(p.innerText||'').trim();if(tt&&tt.length<200&&!p.querySelector('input,textarea,select'))s=tt;p=p.previousElementSibling;g++}n=n.parentElement;k++}}
 return s.replace(/\s+/g,' ').trim().slice(0,110)}catch(z){return ''}};
 for(var i=0;i<q.length&&arr.length<110;i++){var e=q[i];try{if(!vis(e))continue;
  if(e.tagName=='LABEL'){var inp=e.querySelector('input,select,textarea');if(inp&&vis(inp))continue}
  var t=String(e.getAttribute('aria-label')||e.innerText||e.value||e.placeholder||e.title||e.alt||'').replace(/\s+/g,' ').trim().slice(0,80);
  var kd=e.tagName.toLowerCase();if(kd=='input')kd+=':'+(e.type||'text');if(e.getAttribute('role'))kd+='/'+e.getAttribute('role');if(e.type=='password')t='[password: user only]';
  var x2=(e.checked||e.getAttribute('aria-checked')=='true'||e.getAttribute('aria-selected')=='true')?' [on]':'';
+ if(e.disabled||e.getAttribute('aria-disabled')=='true')x2+=' [disabled]';else if(e.readOnly)x2+=' [readonly]';
  if(e.tagName=='SELECT'){x2+=' value="'+(e.selectedIndex>=0?e.options[e.selectedIndex].text.trim().slice(0,40):'')+'" options: '+Array.prototype.slice.call(e.options,0,14).map(function(o){return o.text.trim().slice(0,30)}).join(' | ')}
  else if((e.tagName=='INPUT'||e.tagName=='TEXTAREA')&&e.type!='password'&&e.type!='file'&&e.type!='checkbox'&&e.type!='radio'&&e.value)x2+=' value="'+e.value.replace(/\s+/g,' ').slice(0,40)+'"';
- var qq='';if(/^(INPUT|TEXTAREA|SELECT)$/.test(e.tagName)||e.isContentEditable){var qv=qf(e);if(qv&&qv!=t)qq=' q="'+qv.replace(/"/g,"'")+'"'}
- out.push('['+arr.length+'] '+kd+' "'+t+'"'+x2+qq+(e.tagName=='A'?' -> '+(e.hostname||''):'')+(e.tagName=='A'&&/\.(pdf|zip|docx?|xlsx?|pptx?|csv|epub|rar|7z|mp3|mp4|apk)(\?|#|$)/i.test(e.href||'')?' file: '+String(e.href).slice(0,160):''));arr.push(e)}catch(z){}}
-Object.defineProperty(window,'__lbA',{value:arr,configurable:true,writable:true});
+ var qq='';if(/^(INPUT|TEXTAREA|SELECT)$/.test(e.tagName)||e.isContentEditable||/combobox|listbox/.test(e.getAttribute('role')||'')){var qv=qf(e);if(qv&&qv!=t)qq=' q="'+qv.replace(/"/g,"'")+'"'}
+ out.push('['+arr.length+'] '+kd+' "'+t+'"'+x2+qq+(e.tagName=='A'?' -> '+(e.hostname||''):'')+(e.tagName=='A'&&/\.(pdf|zip|docx?|xlsx?|pptx?|csv|epub|rar|7z|mp3|mp4|apk)(\?|#|$)/i.test(e.href||'')?' file: '+String(e.href).slice(0,160):''));try{e.setAttribute('data-lbx',arr.length)}catch(z){}arr.push(e)}catch(z){}}
+Object.defineProperty(window,'__lbA',{value:arr,configurable:true,writable:true});Object.defineProperty(window,'__lbS',{value:arr.map(sigOf),configurable:true,writable:true});
 var tx='',w=document.createTreeWalker(document.body||document,NodeFilter.SHOW_TEXT|NodeFilter.SHOW_ELEMENT),n,c=0;
 while((n=w.nextNode())&&tx.length<2400&&c++<7000){if(n.nodeType==1){var cl=typeof n.className=='string'?n.className:'';if(/(^|[ _-])(star-)?rating/i.test(cl)&&vis(n)){var rt=cl.replace(/star-rating|rating/ig,'').trim();if(rt)tx+='[rating: '+rt+'] '}else if(n.tagName=='IMG'&&n.alt&&vis(n))tx+='[image: '+n.alt.slice(0,60)+'] ';continue}var s=n.nodeValue.trim(),p=n.parentElement;if(s&&p&&!/^(SCRIPT|STYLE|NOSCRIPT|TEMPLATE)$/.test(p.tagName)&&vis(p))tx+=s.replace(/\s+/g,' ')+' '}
 tx=tx.slice(0,2400);
 return 'URL: '+location.href.slice(0,200)+'\nTitle: '+document.title.slice(0,100)+'\nElements:\n'+out.join('\n')+'\nText: '+tx}catch(x){return 'error: '+String(x).slice(0,80)}})())H";
 
-static const wchar_t* kAgFp = L"(function(){try{var a=document.activeElement;return location.href+'|'+(document.body?document.body.innerText.length:0)+'|'+document.querySelectorAll('*:not([data-lbfx]):not(#__lbcur):not(#__lbcur *)').length+'|'+document.querySelectorAll(':checked,[aria-checked=true],[aria-selected=true],[aria-expanded=true]').length+'|'+(a&&a.value?a.value.length:0)+'|'+scrollY}catch(x){return 'e'}})()";
+static const wchar_t* kAgFp = L"(function(){try{var a=document.activeElement;return location.href+'|'+(document.body?document.body.innerText.length:0)+':'+(document.body?document.body.innerText.slice(0,80):'')+'|'+document.querySelectorAll('*:not([data-lbfx]):not(#__lbcur):not(#__lbcur *)').length+'|'+document.querySelectorAll(':checked,[aria-checked=true],[aria-selected=true],[aria-expanded=true]').length+'|'+(a&&a.value?a.value.length:0)+'|'+scrollY}catch(x){return 'e'}})()";
 // Runs an action in the target tab. Returns text; "NEEDCONFIRM:..." = Libra must ask the user first.
 static const wchar_t* kAgAct = LR"H((function(op,id,tx,ok,fr){try{
 var A=window.__lbA||[],e=A[+id];
+if(op=='mark'){if(!e)return 'REFUSED: bad element';e.scrollIntoView({block:'center'});var r=e.getBoundingClientRect(),d=document.createElement('div');d.setAttribute('data-lbfx','1');d.style.cssText='position:absolute;pointer-events:none;z-index:2147483647;border:2px solid #d00;border-radius:6px;left:'+(r.left+scrollX-4)+'px;top:'+(r.top+scrollY-4)+'px;width:'+(r.width+8)+'px;height:'+(r.height+8)+'px';var g=document.createElement('div');g.textContent=tx||'Out of my capacity: please fill this in';g.style.cssText='position:absolute;left:0;top:-26px;background:#d00;color:#fff;font:600 12px system-ui;padding:3px 8px;border-radius:4px;white-space:nowrap';d.appendChild(g);document.documentElement.appendChild(d);var rm=function(){d.remove()};e.addEventListener('change',rm,{once:true});e.addEventListener('input',rm,{once:true});setTimeout(rm,180000);return 'REFUSED: out of my capacity. I marked it on the screen for the user. Do not touch it; continue with the other fields.'}
+)H" AG_SIG_JS AG_PT_JS LR"H(if(op=='tick'){if(!e||!e.isConnected)return 'TICK';var tr=e.getBoundingClientRect(),bd=String(tx).indexOf('BAD')==0,tc=bd?'#d00':'#12a150';if(e.__lbk)e.__lbk.remove();var td=document.createElement('div');td.setAttribute('data-lbfx','1');td.style.cssText='position:absolute;pointer-events:none;z-index:2147483646;border:2px solid '+tc+';border-radius:6px;left:'+(tr.left+scrollX-3)+'px;top:'+(tr.top+scrollY-3)+'px;width:'+(tr.width+6)+'px;height:'+(tr.height+6)+'px';var tg=document.createElement('div');tg.textContent=bd?'✗ '+(String(tx).slice(4)||'Not filled'):'✓ filled';tg.style.cssText='position:absolute;right:0;top:-18px;background:'+tc+';color:#fff;font:600 11px system-ui;padding:1px 6px;border-radius:4px;white-space:nowrap';td.appendChild(tg);document.documentElement.appendChild(td);e.__lbk=td;var trm=function(){td.remove()};if(bd){e.addEventListener('input',trm,{once:true});e.addEventListener('change',trm,{once:true})}setTimeout(trm,300000);return 'TICK'}
 var bad=/passw|card|cvv|cvc|cc-|credit|debit|iban|routing|account.?n(um|o)|otp|one-time|2fa|mfa|verif(y|ication).?code|ssn|social.?security|aadhaar|security code|secret|\bpin\b/i;
 var sens=/\b(buy|pay|purchase|checkout|place order|order now|delete|remove|send|submit|confirm|transfer|withdraw|subscribe|log ?out|sign ?out|post|publish)\b/i;
 var base=function(h){return h.split('.').slice(-2).join('.')};
@@ -133,6 +149,8 @@ if(op=='key'){if(!/^(Enter|Tab|Escape|Space|ArrowDown|ArrowUp)$/.test(tx))return
  return 'KEYAT:'+tx;
  var o={key:tx,bubbles:true};if(f){f.dispatchEvent(new KeyboardEvent('keydown',o));f.dispatchEvent(new KeyboardEvent('keyup',o))}return 'key '+tx}
 if(!e||!e.isConnected)return 'REFUSED: unknown element, look at the new page list';
+if(window.__lbS&&window.__lbS[+id]!==sigOf(e))return 'REFUSED: stale element number, the page changed since the list; use the new list';
+if(op!='click'&&(e.disabled||e.readOnly||e.getAttribute('aria-disabled')=='true'))return 'REFUSED: that field is disabled or read-only';
 var lab=(e.getAttribute('aria-label')||e.innerText||e.value||'').replace(/\s+/g,' ').slice(0,60);
 if(op=='select'){if(e.tagName!='SELECT')return 'REFUSED: not a dropdown, click it instead';var w=tx.toLowerCase(),op2=Array.prototype.find.call(e.options,function(o){return o.text.trim().toLowerCase()==w||o.value.toLowerCase()==w})||Array.prototype.find.call(e.options,function(o){return o.text.toLowerCase().indexOf(w)>=0});
  if(!op2)return 'REFUSED: no such option';go(function(){e.value=op2.value;e.dispatchEvent(new Event('input',{bubbles:true}));e.dispatchEvent(new Event('change',{bubbles:true}))});return 'selected'}
@@ -144,7 +162,7 @@ if(op=='click'){var a=e.closest('a[href]');
  if(!ok&&/^(BUTTON|A)$/.test(e.tagName)&&document.querySelector('input[autocomplete^="cc-"],input[name*="card" i],input[id*="card" i]'))return 'NEEDCONFIRM:continue on a page that asks for payment details';
  if(!ok&&(sens.test(lab)||(e.type=='submit'&&e.form)))return 'NEEDCONFIRM:click "'+lab+'"';
  if(!ok&&!fr&&a&&a.hostname&&base(a.hostname)!=base(location.hostname))return 'NEEDCONFIRM:leave this site for '+a.hostname;
- cur(e);var q=e.getBoundingClientRect(),cx=Math.round(q.left+Math.min(q.width/2,60)),cy=Math.round(q.top+q.height/2),t=document.elementFromPoint(cx,cy);if(t&&(t===e||e.contains(t)||t.contains(e)))return 'CLICKAT:'+cx+','+cy;go(function(){tap(e);e.click()});return 'clicked'}
+ cur(e);var P=ptOf(e);if(typeof P=='string')return 'REFUSED: cannot click it, '+P+'. Close a pop-up, scroll, or pick another element';var cx=P[0],cy=P[1];return 'CLICKAT:'+cx+','+cy;go(function(){tap(e);e.click()});return 'clicked'}
 return 'REFUSED'}catch(x){return 'error: '+String(x).slice(0,80)}}))H";
 
 // ── memory: the user's own notes/documents (Markdown), encrypted on disk, sent to the provider only inside a task ──
@@ -203,6 +221,11 @@ void BrowserWindow::AgSend(const std::wstring& js) {
         if (!src.get() || IsHttp(src.get())) continue;   // never into a page that came from the web, whatever its tab says
         t->webView->ExecuteScript(js.c_str(), nullptr); return; }
 }
+void BrowserWindow::AgCleanLbx(Tab* t) {
+    if (t && t->webView) {
+        t->webView->ExecuteScript(L"(function(){try{document.querySelectorAll('[data-lbx]').forEach(function(e){e.removeAttribute('data-lbx')})}catch(x){}})()", nullptr);
+    }
+}
 void BrowserWindow::AgStop(const wchar_t* why) {
     m_agPaused = false;
     AgFileHook(false);
@@ -211,7 +234,7 @@ void BrowserWindow::AgStop(const wchar_t* why) {
         if (hi >= 0 && ri >= 0) { CloseTab(ri); hi = IndexOf(m_agHome); if (hi >= 0) SwitchTab(hi); m_agTarget = m_agHome; if (m_agDock) ApplyDock(); }
         m_agRes = nullptr; m_agHome = nullptr;
     }
-    if (m_agRun) { int ti = AgTarget(); if (ti >= 0) m_tabs[ti]->webView->ExecuteScript(L"(function(){var c=document.getElementById('__lbcur');if(c)c.remove()})()", nullptr); }   // remove the pointer overlay
+    if (m_agRun) { int ti = AgTarget(); if (ti >= 0) { m_tabs[ti]->webView->ExecuteScript(L"(function(){var c=document.getElementById('__lbcur');if(c)c.remove()})()", nullptr); AgCleanLbx(m_tabs[ti].get()); } }   // remove the pointer overlay and any temporary tags
     m_agRun = false; ++m_agGen;
     if (why && *why) AgSend(L"lbStop(" + AgJs(why) + L")");
 }
@@ -257,12 +280,12 @@ static std::wstring AgFrameSnap(int base) {   // the page snapshot script, numbe
 }
 void BrowserWindow::AgSnapFrames(Tab* t, unsigned gen, std::wstring acc, std::vector<wil::com_ptr<ICoreWebView2Frame2>> fr, size_t i, int total, std::vector<AgFr> got) {
     if (gen != m_agGen || !m_agRun || IndexOf(t) < 0) return;
-    if (i >= fr.size() || total > 240 || i >= 12) { m_agFr = got; AgSend(L"lbSnap(" + acc + L")"); return; }
+    if (i >= fr.size() || total > 240 || i >= 12) { m_agFr = got; AgSendSnap(t, gen, acc); return; }
     std::wstring js = AgFrameSnap(total); auto f = fr[i];
     HRESULT hr = f->ExecuteScript(js.c_str(), Microsoft::WRL::Callback<ICoreWebView2ExecuteScriptCompletedHandler>(
         [this, t, gen, acc, fr, i, total, got, f](HRESULT, LPCWSTR r) mutable -> HRESULT {
             std::wstring s = AgOkStr(r); std::wstring a2 = acc; int tot2 = total;
-            if (s.rfind(L"\"HUMAN_CHECK", 0) == 0) { a2 = s; got.clear(); m_agFr.clear(); AgSend(L"lbSnap(" + a2 + L")"); return S_OK; }   // a CAPTCHA frame: pause like on the main page
+            if (s.rfind(L"\"HUMAN_CHECK", 0) == 0) { a2 = s; got.clear(); m_agFr.clear(); AgCleanLbx(t); AgSend(L"lbSnap(" + a2 + L")"); return S_OK; }   // a CAPTCHA frame: pause like on the main page
             int n = AgCountEls(s);
             if (n > 0 && s.rfind(L"\"FRAME ", 0) == 0) {
                 std::string host; for (size_t k = 7; k < s.size() && s[k] != L'\\' && s[k] != L'"'; ++k) host += (char)(s[k] < 128 ? s[k] : '?');
@@ -271,13 +294,37 @@ void BrowserWindow::AgSnapFrames(Tab* t, unsigned gen, std::wstring acc, std::ve
             AgSnapFrames(t, gen, a2, fr, i + 1, tot2, got); return S_OK; }).Get());
     if (FAILED(hr)) AgSnapFrames(t, gen, acc, fr, i + 1, total, got);
 }
+void BrowserWindow::AgSendSnap(Tab* t, unsigned gen, const std::wstring& s) {
+    if (gen != m_agGen || !m_agRun || IndexOf(t) < 0 || !t->webView) return;
+    if (s.rfind(L"\"HUMAN_CHECK", 0) == 0 || s == L"\"error\"") {
+        AgCleanLbx(t);
+        AgSend(L"lbSnap(" + s + L")");
+        return;
+    }
+    // shortcut: main frame AX tree only, full frame tree when CDP supports cross-frame AX cleanly
+    t->webView->CallDevToolsProtocolMethod(L"Accessibility.getFullAXTree", L"{}",
+        Microsoft::WRL::Callback<ICoreWebView2CallDevToolsProtocolMethodCompletedHandler>(
+            [this, gen, t, s](HRESULT hr, LPCWSTR r) -> HRESULT {
+                if (gen != m_agGen || !m_agRun || IndexOf(t) < 0) return S_OK;
+                std::wstring j = r ? r : L"";
+                if (FAILED(hr) || j.empty() || j.size() > 400000) {
+                    AgCleanLbx(t);
+                    AgSend(L"lbSnap(" + s + L")");
+                    return S_OK;
+                }
+                AgSend(L"lbAx(" + j + L"," + s + L")");
+                return S_OK;
+            }).Get());
+}
 
 void BrowserWindow::AgRunAct(int ti, const std::wstring& op, const std::wstring& id, const std::wstring& tx, bool ok) {
     unsigned gen = m_agGen;
+    if (op == L"pick") { AgRunPick(ti, _wtoi(id.c_str()), tx, gen); return; }
+    if (op == L"drag") { AgRunDrag(ti, _wtoi(id.c_str()), _wtoi(tx.c_str()), gen); return; }
     bool fr = false;   // on a search-engine page, result links may be followed without asking
     { dl::Url cu; if (dl::Crack(m_tabs[ti]->url, cu)) for (const wchar_t* e : { L"google.", L"bing.", L"duckduckgo.", L"brave.", L"startpage.", L"ecosia.", L"perplexity." }) if (cu.host.find(e) == 0 || cu.host.find(std::wstring(L".") + e) != std::wstring::npos) fr = true; }
     std::wstring script = kAgAct; wil::com_ptr<ICoreWebView2Frame2> frame; int rid = _wtoi(id.c_str());
-    if ((op == L"click" || op == L"type" || op == L"select") && rid >= m_agMainN) for (auto& g : m_agFr) if (rid >= g.base && rid < g.base + g.n) { frame = g.f; rid -= g.base; break; }
+    if ((op == L"click" || op == L"type" || op == L"select" || op == L"tick") && rid >= m_agMainN) for (auto& g : m_agFr) if (rid >= g.base && rid < g.base + g.n) { frame = g.f; rid -= g.base; break; }
     if (frame) { size_t p = script.find(LR"(return 'CLICKAT:'+cx+','+cy;)"); if (p != std::wstring::npos) script.erase(p, wcslen(LR"(return 'CLICKAT:'+cx+','+cy;)")); }   // inside a frame the page element itself is clicked
     std::wstring js = script + L"(" + AgJs(op) + L"," + std::to_wstring(rid) + L"," + AgJs(tx) + L"," + (ok ? L"true" : L"false") + L"," + (fr ? L"true" : L"false") + L")";
     auto handler = Microsoft::WRL::Callback<ICoreWebView2ExecuteScriptCompletedHandler>(
@@ -301,7 +348,7 @@ void BrowserWindow::AgRunAct(int ti, const std::wstring& op, const std::wstring&
             }
             if (s.rfind(L"\"CLICKAT:", 0) == 0) {   // a real (trusted) mouse click through the browser engine, so sites and file choosers accept it
                 m_agClickX = _wtoi(s.c_str() + 9); size_t cm = s.find(L','); m_agClickY = cm == std::wstring::npos ? 0 : _wtoi(s.c_str() + cm + 1);
-                m_agClickTab = t; m_agClickId = id; m_agClickRid = rid; m_agClickFrame = nullptr; SetTimer(m_hWnd, 2021, 500, nullptr); return S_OK;   // the answer comes after we have checked that the click did something
+                m_agClickTab = t; m_agClickId = id; m_agClickRid = rid; m_agClickFrame = nullptr; m_agStab = 0; SetTimer(m_hWnd, 2021, 500, nullptr); return S_OK;   // the answer comes after we have checked that the click did something
             }
             if (op == L"click" && s == L"\"clicked\"") {   // a page-level click (covered element, or inside a frame): check it really did something
                 m_agClickTab = t; m_agClickId = id; m_agClickRid = rid; m_agClickFrame = frame; m_agTry = 0; m_agClickX = m_agClickY = 0;
@@ -311,6 +358,233 @@ void BrowserWindow::AgRunAct(int ti, const std::wstring& op, const std::wstring&
             AgSend(L"lbAct(" + s + L")"); return S_OK;
         });
     if (frame) frame->ExecuteScript(js.c_str(), handler.Get()); else m_tabs[ti]->webView->ExecuteScript(js.c_str(), handler.Get());
+}
+
+void BrowserWindow::AgRunPick(int ti, int rid, const std::wstring& tx, unsigned gen) {
+    if (IndexOf(m_tabs[ti].get()) < 0 || !m_tabs[ti]->webView) return;
+    Tab* t = m_tabs[ti].get();
+    m_agPickTab = t;
+    m_agPickRid = rid;
+    m_agPickTx = tx;
+
+    std::wstring js = LR"JS((function(id, tx) {
+        try {
+            var A = window.__lbA || [], e = A[+id];
+            if (!e || !e.isConnected) return 'ERR:no_elem';
+            var w = String(tx || '').trim().toLowerCase();
+            var findOpt = function() {
+                var sel = '[role="option"], [role="menuitem"], .select__option, [id*="-option-"], [class*="-option"], [data-value], li';
+                var all = document.querySelectorAll(sel);
+                var best = null;
+                for (var i = 0; i < all.length; i++) {
+                    var o = all[i];
+                    var r = o.getBoundingClientRect();
+                    if (r.width < 3 || r.height < 3 || r.bottom < 0 || r.top > innerHeight) continue;
+                    var s = getComputedStyle(o);
+                    if (s.visibility != 'visible' || s.display == 'none' || +s.opacity < .1) continue;
+                    var t = (o.innerText || o.getAttribute('aria-label') || o.getAttribute('data-value') || '').trim().toLowerCase();
+                    if (t === w) return o;
+                    if (w.length >= 2 && t.indexOf(w) >= 0 && (!best || t.length < best.t.length)) best = { el: o, t: t };
+                }
+                return best ? best.el : null;
+            };
+            var opt = findOpt();
+            if (opt) {
+                var ro = opt.getBoundingClientRect();
+                return 'OPT:' + Math.round(ro.left + ro.width/2) + ',' + Math.round(ro.top + ro.height/2);
+            }
+            e.scrollIntoView({block:'center', inline:'center'});
+            var re = e.getBoundingClientRect();
+            return 'OPEN:' + Math.round(re.left + Math.min(re.width/2, 60)) + ',' + Math.round(re.top + re.height/2);
+        } catch(x) { return 'ERR:' + String(x); }
+    }))JS" + std::wstring(L"(") + std::to_wstring(rid) + L"," + AgJs(tx) + L")";
+
+    t->webView->ExecuteScript(js.c_str(), Microsoft::WRL::Callback<ICoreWebView2ExecuteScriptCompletedHandler>(
+        [this, gen, t, tx](HRESULT, LPCWSTR r) -> HRESULT {
+            if (gen != m_agGen || !m_agRun || IndexOf(t) < 0) return S_OK;
+            std::wstring res = AgOkStr(r);
+            if (res.size() >= 2 && res.front() == L'"' && res.back() == L'"') res = res.substr(1, res.size() - 2);
+            if (res.rfind(L"OPT:", 0) == 0) {
+                int ox = _wtoi(res.c_str() + 4);
+                size_t cm = res.find(L',');
+                int oy = cm == std::wstring::npos ? 0 : _wtoi(res.c_str() + cm + 1);
+                auto ev = [t](const wchar_t* ty, int x, int y, int b, int cc) {
+                    std::wstring j = std::wstring(L"{\"type\":\"") + ty + L"\",\"x\":" + std::to_wstring(x) + L",\"y\":" + std::to_wstring(y) + L",\"button\":\"" + (b || cc ? L"left" : L"none") + L"\",\"buttons\":" + std::to_wstring(b) + L",\"clickCount\":" + std::to_wstring(cc) + L"}";
+                    t->webView->CallDevToolsProtocolMethod(L"Input.dispatchMouseEvent", j.c_str(), nullptr);
+                };
+                ev(L"mouseMoved", ox, oy, 0, 0);
+                ev(L"mousePressed", ox, oy, 1, 1);
+                ev(L"mouseReleased", ox, oy, 0, 1);
+                AgSend(L"lbAct(\"selected \\\"" + tx + L"\\\"\")");
+                return S_OK;
+            }
+            if (res.rfind(L"OPEN:", 0) == 0) {
+                int ex = _wtoi(res.c_str() + 5);
+                size_t cm = res.find(L',');
+                int ey = cm == std::wstring::npos ? 0 : _wtoi(res.c_str() + cm + 1);
+                auto ev = [t](const wchar_t* ty, int x, int y, int b, int cc) {
+                    std::wstring j = std::wstring(L"{\"type\":\"") + ty + L"\",\"x\":" + std::to_wstring(x) + L",\"y\":" + std::to_wstring(y) + L",\"button\":\"" + (b || cc ? L"left" : L"none") + L"\",\"buttons\":" + std::to_wstring(b) + L",\"clickCount\":" + std::to_wstring(cc) + L"}";
+                    t->webView->CallDevToolsProtocolMethod(L"Input.dispatchMouseEvent", j.c_str(), nullptr);
+                };
+                ev(L"mouseMoved", ex, ey, 0, 0);
+                ev(L"mousePressed", ex, ey, 1, 1);
+                ev(L"mouseReleased", ex, ey, 0, 1);
+                SetTimer(m_hWnd, 2023, 350, nullptr);
+                return S_OK;
+            }
+            AgSend(L"lbAct(\"REFUSED: could not open dropdown\")");
+            return S_OK;
+        }).Get());
+}
+
+static unsigned s_pickTyped = 0;
+void BrowserWindow::AgPickCheck() {
+    int i = m_agPickTab ? IndexOf(m_agPickTab) : -1;
+    if (i < 0 || !m_agRun || !m_tabs[i]->webView) return;
+    Tab* t = m_tabs[i].get();
+    unsigned gen = m_agGen;
+    std::wstring tx = m_agPickTx;
+
+    std::wstring js = LR"JS((function(tx) {
+        try {
+            var w = String(tx || '').trim().toLowerCase();
+            var sel = '[role="option"], [role="menuitem"], .select__option, [data-value], li';
+            var all = document.querySelectorAll(sel);
+            var best = null;
+            for (var i = 0; i < all.length; i++) {
+                var o = all[i];
+                var r = o.getBoundingClientRect();
+                if (r.width < 3 || r.height < 3 || r.bottom < 0 || r.top > innerHeight) continue;
+                var s = getComputedStyle(o);
+                if (s.visibility != 'visible' || s.display == 'none' || +s.opacity < .1) continue;
+                var t = (o.innerText || o.getAttribute('aria-label') || o.getAttribute('data-value') || '').trim().toLowerCase();
+                if (t === w) return Math.round(r.left + r.width/2) + ',' + Math.round(r.top + r.height/2);
+                if (w.length >= 2 && t.indexOf(w) >= 0 && (!best || t.length < best.t.length)) best = { r: r, t: t };
+            }
+            if (best) return Math.round(best.r.left + best.r.width/2) + ',' + Math.round(best.r.top + best.r.height/2);
+            var ae = document.activeElement; if (ae && ae.tagName == 'INPUT' && ae.value.toLowerCase() != w) { var ds = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value'); ds.set.call(ae, tx); ae.dispatchEvent(new Event('input', { bubbles: true })); return 'TYPED'; }
+            return 'NOT_FOUND';
+        } catch(x) { return 'ERR:' + String(x); }
+    }))JS" + std::wstring(L"(") + AgJs(tx) + L")";
+
+    t->webView->ExecuteScript(js.c_str(), Microsoft::WRL::Callback<ICoreWebView2ExecuteScriptCompletedHandler>(
+        [this, gen, t, tx](HRESULT, LPCWSTR r) -> HRESULT {
+            if (gen != m_agGen || !m_agRun || IndexOf(t) < 0) return S_OK;
+            std::wstring res = AgOkStr(r);
+            if (res.size() >= 2 && res.front() == L'"' && res.back() == L'"') res = res.substr(1, res.size() - 2);
+            size_t cm = res.find(L',');
+            if (cm != std::wstring::npos) {
+                if (s_pickTyped == gen) {   // a type-to-search dropdown: Enter picks the highlighted match (menu is open, so it does not submit)
+                    s_pickTyped = 0;
+                    for (const wchar_t* ty : { L"rawKeyDown", L"keyUp" }) { std::wstring j = std::wstring(L"{\"type\":\"") + ty + L"\",\"key\":\"Enter\",\"code\":\"Enter\",\"windowsVirtualKeyCode\":13}"; t->webView->CallDevToolsProtocolMethod(L"Input.dispatchKeyEvent", j.c_str(), nullptr); }
+                    AgSend(L"lbAct(\"selected \\\"" + tx + L"\\\"\")"); return S_OK;
+                }
+                int ox = _wtoi(res.c_str());
+                int oy = _wtoi(res.c_str() + cm + 1);
+                auto ev = [t](const wchar_t* ty, int x, int y, int b, int cc) {
+                    std::wstring j = std::wstring(L"{\"type\":\"") + ty + L"\",\"x\":" + std::to_wstring(x) + L",\"y\":" + std::to_wstring(y) + L",\"button\":\"" + (b || cc ? L"left" : L"none") + L"\",\"buttons\":" + std::to_wstring(b) + L",\"clickCount\":" + std::to_wstring(cc) + L"}";
+                    t->webView->CallDevToolsProtocolMethod(L"Input.dispatchMouseEvent", j.c_str(), nullptr);
+                };
+                ev(L"mouseMoved", ox, oy, 0, 0);
+                ev(L"mousePressed", ox, oy, 1, 1);
+                ev(L"mouseReleased", ox, oy, 0, 1);
+                AgSend(L"lbAct(\"selected \\\"" + tx + L"\\\"\")");
+                return S_OK;
+            }
+            if (res == L"TYPED") { s_pickTyped = gen; SetTimer(m_hWnd, 2023, 800, nullptr); return S_OK; }   // typed the words into a search dropdown: look for the option again
+            AgSend(L"lbAct(\"REFUSED: option \\\"" + tx + L"\\\" not found in dropdown\")");
+            return S_OK;
+        }).Get());
+}
+
+void BrowserWindow::AgRunDrag(int ti, int id1, int id2, unsigned gen) {
+    if (IndexOf(m_tabs[ti].get()) < 0 || !m_tabs[ti]->webView) return;
+    Tab* t = m_tabs[ti].get();
+    m_agClickTab = t;
+
+    std::wstring js = LR"JS((function(id1, id2) {
+        try {
+            var A = window.__lbA || [], e1 = A[+id1], e2 = A[+id2];
+            if (!e1 || !e1.isConnected || !e2 || !e2.isConnected) return 'ERR:element not found';
+            e1.scrollIntoView({block:'center', inline:'center'});
+            var r1 = e1.getBoundingClientRect(), r2 = e2.getBoundingClientRect();
+            return Math.round(r1.left + r1.width/2) + ',' + Math.round(r1.top + r1.height/2) + ',' +
+                   Math.round(r2.left + r2.width/2) + ',' + Math.round(r2.top + r2.height/2);
+        } catch(x) { return 'ERR:' + String(x); }
+    }))JS" + std::wstring(L"(") + std::to_wstring(id1) + L"," + std::to_wstring(id2) + L")";
+
+    t->webView->ExecuteScript(js.c_str(), Microsoft::WRL::Callback<ICoreWebView2ExecuteScriptCompletedHandler>(
+        [this, gen, t, id1, id2](HRESULT, LPCWSTR r) -> HRESULT {
+            if (gen != m_agGen || !m_agRun || IndexOf(t) < 0) return S_OK;
+            std::wstring res = AgOkStr(r);
+            if (res.size() >= 2 && res.front() == L'"' && res.back() == L'"') res = res.substr(1, res.size() - 2);
+            if (res.rfind(L"ERR:", 0) == 0) {
+                AgSend(L"lbAct(\"REFUSED: " + res + L"\")");
+                return S_OK;
+            }
+            int x1 = 0, y1 = 0, x2 = 0, y2 = 0;
+            if (swscanf_s(res.c_str(), L"%d,%d,%d,%d", &x1, &y1, &x2, &y2) != 4) {
+                AgSend(L"lbAct(\"REFUSED: could not determine coordinates\")");
+                return S_OK;
+            }
+            AgExecT(kAgFp, Microsoft::WRL::Callback<ICoreWebView2ExecuteScriptCompletedHandler>(
+                [this, gen, t, id1, id2, x1, y1, x2, y2](HRESULT, LPCWSTR fp) -> HRESULT {
+                    if (gen != m_agGen || !m_agRun || IndexOf(t) < 0) return S_OK;
+                    m_agFp = fp ? fp : L"";
+                    std::wstring djs = LR"JS((function(id1, id2) {
+                        try {
+                            var A = window.__lbA || [], e1 = A[+id1], e2 = A[+id2];
+                            if (e1 && e2) {
+                                var dt = new DataTransfer();
+                                e1.dispatchEvent(new DragEvent('dragstart', { bubbles: true, cancelable: true, dataTransfer: dt }));
+                                e2.dispatchEvent(new DragEvent('dragenter', { bubbles: true, cancelable: true, dataTransfer: dt }));
+                                e2.dispatchEvent(new DragEvent('dragover', { bubbles: true, cancelable: true, dataTransfer: dt }));
+                                e2.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: dt }));
+                                e1.dispatchEvent(new DragEvent('dragend', { bubbles: true, cancelable: true, dataTransfer: dt }));
+                            }
+                        } catch(z) {}
+                    }))JS" + std::wstring(L"(") + std::to_wstring(id1) + L"," + std::to_wstring(id2) + L")";
+                    t->webView->ExecuteScript(djs.c_str(), nullptr);
+                    auto move = [t](int x, int y, int buttons) {
+                        std::wstring j = std::wstring(L"{\"type\":\"mouseMoved\",\"x\":" + std::to_wstring(x) + L",\"y\":" + std::to_wstring(y) + L",\"button\":\"none\",\"buttons\":" + std::to_wstring(buttons) + L"}");
+                        t->webView->CallDevToolsProtocolMethod(L"Input.dispatchMouseEvent", j.c_str(), nullptr);
+                    };
+                    auto press = [t](int x, int y) {
+                        std::wstring j = std::wstring(L"{\"type\":\"mousePressed\",\"x\":" + std::to_wstring(x) + L",\"y\":" + std::to_wstring(y) + L",\"button\":\"left\",\"buttons\":1,\"clickCount\":1}");
+                        t->webView->CallDevToolsProtocolMethod(L"Input.dispatchMouseEvent", j.c_str(), nullptr);
+                    };
+                    auto release = [t](int x, int y) {
+                        std::wstring j = std::wstring(L"{\"type\":\"mouseReleased\",\"x\":" + std::to_wstring(x) + L",\"y\":" + std::to_wstring(y) + L",\"button\":\"left\",\"buttons\":0,\"clickCount\":1}");
+                        t->webView->CallDevToolsProtocolMethod(L"Input.dispatchMouseEvent", j.c_str(), nullptr);
+                    };
+
+                    move(x1, y1, 0);
+                    press(x1, y1);
+                    for (int k = 1; k <= 10; ++k) {
+                        int xk = x1 + (x2 - x1) * k / 10;
+                        int yk = y1 + (y2 - y1) * k / 10;
+                        move(xk, yk, 1);
+                    }
+                    release(x2, y2);
+
+                    SetTimer(m_hWnd, 2024, 600, nullptr);
+                    return S_OK;
+                }).Get());
+            return S_OK;
+        }).Get());
+}
+
+void BrowserWindow::AgDragCheck() {
+    int i = m_agClickTab ? IndexOf(m_agClickTab) : -1; if (i < 0 || !m_agRun || !m_tabs[i]->webView) return;
+    unsigned gen = m_agGen;
+    auto h = Microsoft::WRL::Callback<ICoreWebView2ExecuteScriptCompletedHandler>([this, gen](HRESULT, LPCWSTR r) -> HRESULT {
+        int j = m_agClickTab ? IndexOf(m_agClickTab) : -1; if (gen != m_agGen || !m_agRun || j < 0) return S_OK;
+        const bool changed = !r || std::wstring(r) != m_agFp;
+        if (changed) AgSend(L"lbAct(\"dragged element; the page changed\")");
+        else AgSend(L"lbAct(\"dragged, but NOTHING changed\")");
+        return S_OK;
+    });
+    AgExecT(kAgFp, h.Get());
 }
 
 #include <spellcheck.h>
@@ -608,8 +882,72 @@ void BrowserWindow::OnAgentPage(int idx, const std::vector<std::wstring>& v) {
             [this, gen, t = m_tabs[ti].get()](HRESULT, LPCWSTR r) -> HRESULT {
                 if (gen != m_agGen || !m_agRun) return S_OK;
                 std::wstring s = AgOkStr(r); m_agFr.clear(); m_agMainN = AgCountEls(s);
-                if (t->frames.empty() || s.rfind(L"\"HUMAN_CHECK", 0) == 0 || IndexOf(t) < 0) { AgSend(L"lbSnap(" + s + L")"); return S_OK; }
+                if (t->frames.empty() || s.rfind(L"\"HUMAN_CHECK", 0) == 0 || IndexOf(t) < 0) { AgSendSnap(t, gen, s); return S_OK; }
                 AgSnapFrames(t, gen, s, t->frames, 0, m_agMainN, {}); return S_OK; }).Get());
+    } else if (c == L"agent.ax_clean") {
+        int ti = AgTarget(); if (ti >= 0) AgCleanLbx(m_tabs[ti].get());
+    } else if (c == L"agent.ax_resolve" && v.size() == 2) {
+        int ti = AgTarget();
+        if (ti < 0 || !m_tabs[ti]->webView) { AgSend(L"lbAxMap({})"); return; }
+        Tab* t = m_tabs[ti].get(); unsigned gen = m_agGen;
+        std::vector<int> bIds;
+        std::wstring rawIds = v[1];
+        size_t pos = 0;
+        while (pos < rawIds.size()) {
+            size_t comma = rawIds.find(L',', pos);
+            if (comma == std::wstring::npos) comma = rawIds.size();
+            std::wstring num = rawIds.substr(pos, comma - pos);
+            if (!num.empty() && num.find_first_not_of(L"0123456789") == std::wstring::npos) {
+                bIds.push_back(_wtoi(num.c_str()));
+                if (bIds.size() >= 20) break;
+            }
+            pos = comma + 1;
+        }
+        if (bIds.empty()) {
+            AgCleanLbx(t);
+            AgSend(L"lbAxMap({})");
+            return;
+        }
+        struct SharedState {
+            int remaining;
+            std::map<int, std::wstring> mapping;
+        };
+        auto state = std::make_shared<SharedState>();
+        state->remaining = (int)bIds.size();
+        for (int bid : bIds) {
+            std::wstring params = L"{\"backendNodeId\":" + std::to_wstring(bid) + L",\"depth\":1}";
+            t->webView->CallDevToolsProtocolMethod(L"DOM.describeNode", params.c_str(),
+                Microsoft::WRL::Callback<ICoreWebView2CallDevToolsProtocolMethodCompletedHandler>(
+                    [this, gen, t, bid, state](HRESULT hr, LPCWSTR r) -> HRESULT {
+                        if (gen != m_agGen || !m_agRun || IndexOf(t) < 0) return S_OK;
+                        if (SUCCEEDED(hr) && r) {
+                            std::wstring json = r;
+                            size_t p = json.find(L"\"data-lbx\"");
+                            if (p != std::wstring::npos) {
+                                size_t q1 = json.find(L'"', p + 10);
+                                if (q1 != std::wstring::npos) {
+                                    size_t q2 = json.find(L'"', q1 + 1);
+                                    if (q2 != std::wstring::npos) {
+                                        state->mapping[bid] = json.substr(q1 + 1, q2 - (q1 + 1));
+                                    }
+                                }
+                            }
+                        }
+                        if (--state->remaining == 0) {
+                            AgCleanLbx(t);
+                            std::wstring mapJson = L"{";
+                            bool first = true;
+                            for (auto& pair : state->mapping) {
+                                if (!first) mapJson += L",";
+                                first = false;
+                                mapJson += L"\"" + std::to_wstring(pair.first) + L"\":\"" + pair.second + L"\"";
+                            }
+                            mapJson += L"}";
+                            AgSend(L"lbAxMap(" + mapJson + L")");
+                        }
+                        return S_OK;
+                    }).Get());
+        }
     } else if (c == L"agent.act" && v.size() == 4) {
         if (m_agPaused) return;
         const std::wstring &op = v[1], &id = v[2]; std::wstring tx = v[3];
@@ -623,8 +961,8 @@ void BrowserWindow::OnAgentPage(int idx, const std::vector<std::wstring>& v) {
               if (lo(m_agTaskRaw).find(lo(tx)) == std::wstring::npos) tx = AgPolish(tx, prot); }   // text the user gave verbatim is typed exactly as given
             AgSend(L"lbPol(" + AgJs(tx) + L")");   // so the review shows the corrected text
         }
-        if ((op == L"type" || op == L"select" || (op == L"key" && tx == L"Enter")) && m_agRes && m_tabs[ti].get() == m_agRes) { AgSend(L"lbAct(\"REFUSED: research tabs are read-only\")"); return; }
-        if (op == L"type" || op == L"select") {   // typing on a site the user never named needs a yes
+        if ((op == L"type" || op == L"select" || op == L"pick" || op == L"drag" || (op == L"key" && tx == L"Enter")) && m_agRes && m_tabs[ti].get() == m_agRes) { AgSend(L"lbAct(\"REFUSED: research tabs are read-only\")"); return; }
+        if (op == L"type" || op == L"select" || op == L"pick" || op == L"drag") {   // typing on a site the user never named needs a yes
             dl::Url cu;
             if (dl::Crack(m_tabs[ti]->url, cu)) {
                 std::wstring dom = RegDom(cu.host), lab = dom.substr(0, dom.find(L'.')); bool named = lab.size() >= 4 && m_agTaskKey.find(lab) != std::wstring::npos;
@@ -635,11 +973,12 @@ void BrowserWindow::OnAgentPage(int idx, const std::vector<std::wstring>& v) {
                 }
             }
         }
-        if (m_tabs[ti]->url.rfind(L"libra://", 0) == 0 && (op == L"click" || op == L"type" || op == L"select" || op == L"key")) { AgSend(L"lbAct(\"REFUSED: use search or navigate here\")"); return; }   // Libra pages and settings are off limits
+        if (m_tabs[ti]->url.rfind(L"libra://", 0) == 0 && (op == L"click" || op == L"type" || op == L"select" || op == L"pick" || op == L"drag" || op == L"key")) { AgSend(L"lbAct(\"REFUSED: use search or navigate here\")"); return; }   // Libra pages and settings are off limits
         for (wchar_t& ch : tx) if (ch < 32 || ch == 127) ch = L' ';
-        bool needId = op == L"click" || op == L"type" || op == L"select";
+        bool needId = op == L"click" || op == L"type" || op == L"select" || op == L"pick" || op == L"drag" || op == L"mark" || op == L"tick";
         if (needId && (id.empty() || id.size() > 3 || id.find_first_not_of(L"0123456789") != std::wstring::npos)) { AgSend(L"lbAct(\"REFUSED: bad element\")"); return; }
-        if (op == L"click" || op == L"type" || op == L"select" || op == L"key" || op == L"scroll") AgRunAct(ti, op, needId ? id : L"0", tx, false);
+        if (op == L"drag" && (tx.empty() || tx.size() > 3 || tx.find_first_not_of(L"0123456789") != std::wstring::npos)) { AgSend(L"lbAct(\"REFUSED: bad target element for drag\")"); return; }
+        if (op == L"click" || op == L"type" || op == L"select" || op == L"pick" || op == L"drag" || op == L"key" || op == L"scroll" || op == L"mark" || op == L"tick") AgRunAct(ti, op, needId ? id : L"0", tx, false);
         else if (op == L"back") { m_tabs[ti]->webView->GoBack(); AgSend(L"lbAct(\"went back\")"); }
         else if (op == L"wait") AgSend(L"lbAct(\"waited\")");
         else if (op == L"navigate" || op == L"search") {   // typed into the address bar, like a person would
@@ -814,8 +1153,23 @@ if(f){var b=document.createElement('div');b.textContent='\u00d7 No reaction';b.s
 void BrowserWindow::AgClickNow() {
     if (m_agPaused) return;   // move, press, release, then (900 ms later) check the page really reacted
     int i = m_agClickTab ? IndexOf(m_agClickTab) : -1; if (i < 0 || !m_agRun || !m_tabs[i]->webView) return;
-    unsigned gen = m_agGen; m_agTry = 0;
-    m_tabs[i]->webView->ExecuteScript(kAgFp, Microsoft::WRL::Callback<ICoreWebView2ExecuteScriptCompletedHandler>([this, gen](HRESULT, LPCWSTR r) -> HRESULT {
+    unsigned gen = m_agGen; m_agTry = 0; m_agNewWin = false;
+    if (m_agStab >= 0) {   // actionability again just before the real click: still there, visible, enabled, not covered, and standing still
+        std::wstring js = std::wstring(L"(function(i){var e=window.__lbA&&window.__lbA[i];if(!e||!e.isConnected)return 'the element is gone from the page';") + AG_PT_JS +
+                          L"var P=ptOf(e);return typeof P=='string'?P:P[0]+','+P[1]})(" + std::to_wstring(m_agClickRid) + L")";
+        m_tabs[i]->webView->ExecuteScript(js.c_str(), Microsoft::WRL::Callback<ICoreWebView2ExecuteScriptCompletedHandler>([this, gen](HRESULT, LPCWSTR r) -> HRESULT {
+            if (gen != m_agGen || !m_agRun || !m_agClickTab) return S_OK;
+            std::wstring s = AgOkStr(r);
+            if (s.size() < 3 || !iswdigit(s[1])) { m_agStab = 0; AgSend(L"lbAct(\"REFUSED: cannot click it right now, \"+" + (s.empty() ? std::wstring(L"''") : s) + L"+\". Close a pop-up, scroll, or pick another element\")"); return S_OK; }
+            int nx = _wtoi(s.c_str() + 1); size_t cm = s.find(L','); int ny = cm == std::wstring::npos ? m_agClickY : _wtoi(s.c_str() + cm + 1);
+            const bool moved = std::abs(nx - m_agClickX) > 2 || std::abs(ny - m_agClickY) > 2;
+            m_agClickX = nx; m_agClickY = ny;
+            if (moved && m_agStab < 4) { ++m_agStab; SetTimer(m_hWnd, 2021, 150, nullptr); return S_OK; }   // it was still moving: look again
+            m_agStab = -m_agStab - 1; AgClickNow(); return S_OK; }).Get());
+        return;
+    }
+    m_agStab = 0;
+    m_tabs[i]->webView->ExecuteScript(kAgFp,Microsoft::WRL::Callback<ICoreWebView2ExecuteScriptCompletedHandler>([this, gen](HRESULT, LPCWSTR r) -> HRESULT {
         int j = m_agClickTab ? IndexOf(m_agClickTab) : -1; if (gen != m_agGen || !m_agRun || j < 0 || !m_tabs[j]->webView) return S_OK;
         m_agFp = r ? r : L"";
         auto ev = [&](const wchar_t* type, int buttons, int cc) {
@@ -841,7 +1195,7 @@ void BrowserWindow::AgClickCheck() {   // did the tap do anything? If not, the n
     unsigned gen = m_agGen;
     auto h = Microsoft::WRL::Callback<ICoreWebView2ExecuteScriptCompletedHandler>([this, gen](HRESULT, LPCWSTR r) -> HRESULT {
         int j = m_agClickTab ? IndexOf(m_agClickTab) : -1; if (gen != m_agGen || !m_agRun || j < 0) return S_OK;
-        const bool changed = !r || std::wstring(r) != m_agFp;   // a navigation (no result) counts as a change
+        const bool changed = !r || std::wstring(r) != m_agFp || m_agNewWin; m_agNewWin = false;   // a navigation (no result) counts as a change
         static const wchar_t* how[] = { L"", L" (the first tap did nothing; it worked with pointer events)", L" (the first taps did nothing; it worked on the nearest real control)", L" (the first taps did nothing; it worked with the keyboard)", L" (the first taps did nothing; it worked at another spot)" };
         if (changed) { AgSend(std::wstring(L"lbAct(\"clicked; the page changed") + how[std::min(m_agTry, 4)] + L"\")"); return S_OK; }
         AgNextStrategy(); return S_OK; });

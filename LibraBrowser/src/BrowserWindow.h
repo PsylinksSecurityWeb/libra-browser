@@ -1,4 +1,5 @@
 #pragma once
+#include "Filters.h"
 #include "pch.h"
 #include "resource.h"
 #include "Tab.h"
@@ -31,7 +32,11 @@ public:
     bool Create(int nCmdShow);
     void OpenTab(const std::wstring& url = L"", bool incognito = false, bool background = false);
     void SetApp(const std::wstring& id, const std::wstring& name, const std::wstring& url, int port) { m_app = true; m_appId = id; m_appName = name; m_appUrl = url; m_appPort = port; }   // web-app window (Apps.h)
-    void SetHostHidden() { m_hostHidden = true; }   // engine host for an app window while the browser is not open: no window shown
+    void SetHostHidden() { m_hostHidden = true; }
+    void SetStartUrl(const std::wstring& u) { m_startUrl = u; }   // private window opened for a link: that page is its first tab
+    void OpenLinkPrivate(const std::wstring& url); void NavRefresh(Tab* t);
+    Flt::Set m_flt; void LoadFilters(); bool FilterBlocks(const wchar_t* uri, const std::wstring& pageUrl, int ctx) const; std::wstring FilterJs() const;   // FilterRun.inl
+    std::wstring m_startUrl;   // engine host for an app window while the browser is not open: no window shown
     int TabHpx() const; void AppMinimized(bool min);
     void CloseTab(int index);
     void SwitchTab(int index);
@@ -176,7 +181,8 @@ private:
     bool TabHid(int i) const; int LastVisTab() const; bool SiteRight(int x, int y); void SiteAdd(const std::wstring& url); void SiteSetList(const std::vector<std::wstring>& v); void SwitchEngineTabs(const std::wstring& oldEu);
     bool DockOn() const { return m_agDock || m_sitePanel; }
     void ToggleAgent(); void ApplyDock(); bool AgAllowedHere() const; int AgDockIdx() const; bool m_agDock = false;
-    void AgFileHook(bool on); void AgFileChosen(void* p); void AgGoNow(); bool m_agPaused = false; bool AgAsk(const std::wstring& cat, const std::wstring& dom, const std::wstring& title, const std::wstring& detail, bool once); void AgClickCheck(); std::wstring m_agClickId, m_agFp; int m_agRetried = 0; std::wstring m_agAttach; std::wstring m_agTaskRaw; std::set<std::wstring> m_agTypeOk; int m_agFcN = 0; void VoiceCmd(const std::wstring& a, const std::wstring& b); void OnVoiceMsg(void* p); bool m_agConv = false; Tab* m_agHome = nullptr; Tab* m_agRes = nullptr; int m_agTabs = 0; void AgKeyChecked(const std::wstring& r); void AgClickNow(); int m_agClickX = 0, m_agClickY = 0; Tab* m_agClickTab = nullptr; int m_agTry = 0, m_agClickRid = 0; wil::com_ptr<ICoreWebView2Frame2> m_agClickFrame; void AgNextStrategy(); void AgExecT(const wchar_t* js, ICoreWebView2ExecuteScriptCompletedHandler* h); EventRegistrationToken m_agFcTok{}; Tab* m_agFcTab = nullptr; Tab* m_agGoTab = nullptr; std::wstring m_agTaskKey, m_agGoUrl;
+    void AgFileHook(bool on); void AgFileChosen(void* p); void AgGoNow(); bool m_agPaused = false; bool AgAsk(const std::wstring& cat, const std::wstring& dom, const std::wstring& title, const std::wstring& detail, bool once); void AgClickCheck(); std::wstring m_agClickId, m_agFp; int m_agRetried = 0; std::wstring m_agAttach; std::wstring m_agTaskRaw; std::set<std::wstring> m_agTypeOk; int m_agFcN = 0; void VoiceCmd(const std::wstring& a, const std::wstring& b); void OnVoiceMsg(void* p); bool m_agConv = false; Tab* m_agHome = nullptr; Tab* m_agRes = nullptr; int m_agTabs = 0; void AgKeyChecked(const std::wstring& r); void AgClickNow(); int m_agClickX = 0, m_agClickY = 0; Tab* m_agClickTab = nullptr; int m_agTry = 0, m_agClickRid = 0, m_agStab = 0; bool m_agNewWin = false; wil::com_ptr<ICoreWebView2Frame2> m_agClickFrame; void AgNextStrategy(); void AgExecT(const wchar_t* js, ICoreWebView2ExecuteScriptCompletedHandler* h); EventRegistrationToken m_agFcTok{}; Tab* m_agFcTab = nullptr; Tab* m_agGoTab = nullptr; std::wstring m_agTaskKey, m_agGoUrl;
+    void AgCleanLbx(Tab* t); void AgSendSnap(Tab* t, unsigned gen, const std::wstring& s); void AgRunPick(int ti, int rid, const std::wstring& tx, unsigned gen); void AgPickCheck(); void AgRunDrag(int ti, int id1, int id2, unsigned gen); void AgDragCheck(); Tab* m_agPickTab = nullptr; int m_agPickRid = 0; std::wstring m_agPickTx;
     bool m_agRun = false; unsigned m_agGen = 0; int m_agSteps = 0; DWORD m_agStart = 0; Tab* m_agTarget = nullptr; std::wstring m_agScope;   // Agent.inl
     void SetAsDefault();
     // --- passwords (Passwords.inl) ---
@@ -234,6 +240,8 @@ private:
     std::vector<DownloadItem> m_dl;
     std::vector<std::wstring> m_closed;
     bool m_cleared = false;
+    std::set<std::wstring> m_ckSeen, m_ckLegacy; bool m_ckInit = false, m_ckBusy = false, m_ckAgain = false, m_closing = false; int m_ckPending = 0;   // cookie sweeper (CookieSweep.inl)
+    bool CkOn() const; void CkSeen(const std::wstring& url); void CkInit(ICoreWebView2* wv); void CkSweep(ICoreWebView2* wv, const std::wstring& next, bool closing); void CkSweepActive(bool closing); void CkWait(DWORD ms);
     // Auto suggest (Suggest.inl)
     bool SgOn() const; void InstallSgScript(Tab* t); void SgSetting(); const std::vector<SgPair>& SgPairs(); void OnSiteSgMessage(Tab* t, const std::wstring& src, const std::wstring& msg); void ShowSg(); void HideSg(); void SgTick(); void SgClick(int what); void SgInsert(int i); void PaintSg(HDC hdc); int SgRowAt(POINT p) const; static LRESULT CALLBACK SgProc(HWND h, UINT msg, WPARAM wp, LPARAM lp);
     HWND m_hSg = nullptr; std::vector<SgHit> m_sgHits; SgField m_sgField; Tab* m_sgTab = nullptr; std::wstring m_sgOrigin; int m_sgHot = -1, m_sgTestClick = 0; DWORD m_sgShown = 0, m_sgRate[2] = { 0, 0 }; RECT m_sgBox{}, m_sgWv{}; std::vector<SgPair> m_sgPairs; ULONGLONG m_sgStamp = 0; bool m_sgLoaded = false;

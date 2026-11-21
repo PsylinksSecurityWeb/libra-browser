@@ -34,7 +34,7 @@ Certificate errors cannot be bypassed silently (a Proceed button, per site, for 
 - The exe is not code-signed.
 - "Proceed anyway" on a bad certificate is the user's responsibility.
 
-## Audit 2026-11-14 (version 3.9.8, beta)
+## Audit 2026-11-14 (version 3.9.16, beta)
 - **Secrets:** the source, tests, docs and release files were searched for API-key patterns (OpenAI, Anthropic, Google, Groq, xAI, GitHub, bearer tokens). None found; the only match is an obviously fake test string. The user's API key lives only in an encrypted file (Windows DPAPI), is never shown, and is sent only to the provider the user chose. "Clear browsing data" never deletes it.
 - **Device details:** the code never reads the computer name, user name, hardware ids, disk serials or network adapters. Sites see one generic Windows identity that changes daily. The compiler's build-folder text is removed from the release exes.
 - **Test hooks:** the `LIBRA_TEST_*` environment variables used by our automated tests (auto-answering Agent questions, opening pages, picking files) now work only if a file named `libra-test.enabled` sits next to the exe. Release packages never contain it, so another program cannot use these variables to weaken a safety check.
@@ -45,6 +45,6 @@ Certificate errors cannot be bypassed silently (a Proceed button, per site, for 
 - **Menu crash fixed:** an empty menu entry could crash the browser when the menu was opened.
 
 
-## 3.9.8 release-scope review
+## 3.9.16 release-scope review
 
-The 3.9.8 additions were reviewed for the sidebar site fetcher, web-app detection, app installation, encrypted app records, shortcut creation/removal, app-window navigation scope, and command-line app launching. The public candidate permits HTTPS sites (plus localhost/127.0.0.1 for local testing), requires explicit installation confirmation, caps downloaded icons, stores app records with Windows DPAPI, and keeps the sponsored feed disabled until its endpoint and public signing keys are independently verified.
+The 3.9.16 source additions were reviewed for cookie sweeping, bounded user filter lists, signed update checks, PDF tooling, backup/import paths, reader mode, and outbound signals. The public candidate keeps sponsored and update network paths inert because no publisher public signing key is configured. User filter files are read-only and size-capped; update installation requires a signed manifest, matching SHA-256, and explicit confirmation.

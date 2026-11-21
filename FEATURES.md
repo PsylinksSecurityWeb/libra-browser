@@ -28,7 +28,7 @@ Many free browsers pay for themselves with your data. Libra Browser doesn't. It 
 
 ---
 
-## New in this version (3.9.8, beta)
+## New in this version (3.9.16, beta)
 
 - **AI Assistant (beta, optional).** Bring your own API key. It can fill forms and read pages for you, asks before anything risky, never types passwords or card numbers, and never solves CAPTCHAs. **When the assistant is closed, the AI sees nothing**: nothing is read for it and nothing is sent.
 - **Auto suggest (optional, no AI, this PC only).** Click an empty name, e-mail, phone or company box and Libra Browser offers the matching value from your own saved notes in its own popup. It opens only after a real click or Tab key and never for passwords, user names, cards or ID numbers.
@@ -210,19 +210,26 @@ The very first time you open Libra Browser, you see only a short film, then a fe
 Built by Psylinks Security Private Limited, India.
 Source: https://github.com/PsylinksSecurityWeb/libra-browser
 
+## 3.9.15 careful form filling by the Assistant
+- Fills form fields one by one, top to bottom, ticks each filled field green, then checks every field again from the bottom up and marks anything empty or wrong in red.
+- Remembers which fields are done for the whole chat, so it does not touch them again.
+- Dropdowns and file uploads are marked "Out of my capacity" in red and left for you; passwords, card numbers and codes are never typed.
+- Safer clicks: refuses covered, disabled or changed elements, waits for moving buttons to stop, counts a new tab as a reaction.
+- Drag action and a local reading of the browser's own accessibility information (nothing leaves the PC).
+
 ## 3.9.6 sidebar sites, settings search
 - **Sidebar sites (Settings > Startup):** a slim bar with your favourite sites (Gmail, WhatsApp Web...). Click one to open it beside the page, with its real logo. The + adds the page you are on, right-click removes a site or hides the bar. It never adds a tab.
 - **Settings search:** one box on top searches every setting (press / to focus).
 - **Internal pages** get a dark tab with their own symbol; changing the search engine updates every open tab; the Libra Meter starts again after an update; Setup closes and restarts only the meter instead of asking you to close the browser, and no longer shows a version.
 
-## 3.9.8 meter, colour mode, offline game, faster screenshots
+## 3.9.16 meter, colour mode, offline game, faster screenshots
 - **Libra Meter:** a tiny always-on PC load meter (CPU as Task Manager shows it, plus disk and memory pressure). Runs without the browser (`LibraBrowser.exe --meter`), tucks into a screen edge as a colour strip and slides out when the mouse touches it. Off by default; reads Windows counters only, sends nothing.
 - **Colour mode and Appearance page:** pick any colour and the toolbar, tabs, address bar, icons and pages follow it.
 - **Libra Pop:** a small bubble-shooter game on the error page when the PC is really offline.
 - **Privacy:** optional Block Microsoft Recall, history retention (keep forever ... do not keep), notifications always refused (no web push), periodic background sync off.
 - **Faster full-page screenshot** (one capture call), a visible cancel button, and Open link in new tab opens in the background.
 
-## 3.9.8 reading, PDFs and a calmer first run
+## 3.9.16 reading, PDFs and a calmer first run
 - **Reader mode (F9):** a clean, text-only view of an article. Pictures and scripts of the site never load in it, and it opens only from F9 on a web page.
 - **PDFs:** downloaded PDFs open in the browser's own PDF viewer in a new tab. "Sign a PDF" (Ctrl+Shift+F) fills in and signs a PDF on this PC and saves a signed copy; the original is never changed. Its two open-source tools (pdf.js, pdf-lib) are downloaded once, on request, and checked against a fixed checksum.
 - **Bookmarks:** import from Chrome, Edge, Brave, Firefox or a file; encrypted backup and restore of bookmarks and a few safe settings (never passwords, history or the Assistant key).
@@ -240,5 +247,11 @@ Source: https://github.com/PsylinksSecurityWeb/libra-browser
 - window.name is cleared when you move to another site.
 - Optional "Clear cookies, site data and cache at startup" with a "Stay signed in on" list (partitioned third-party cookies included).
 
-## 3.9.8 web apps
+## 3.9.16 web apps
 Install a website as an app: Libra Browser checks by itself, with the engine's own installability test, whether a site is an installable web app (YouTube, WhatsApp Web, Spotify and many more). An install icon appears (address bar, or the sidebar strip). One Windows sheet asks first; then the site's own icon is downloaded once and the app opens in its own window with no tabs and no address bar. It shares the browser's engine and sign-in, so it costs about the same memory as one tab, and a minimised app falls asleep. Start menu shortcut (Desktop optional), Settings > Apps (Open / Remove), manual "Install this site as an app" in the menu, and "Pin to taskbar" starts that app. Other sites open in the browser. No background activity: no notifications, no auto start. Also: Brave logo, Yahoo search, a thicker Libra Meter edge strip.
+
+## 3.9.9 cross-site tracking
+Third-party cookies are removed when you open another site: ad networks and other third parties cannot follow you from one site to the next (tested on six real flight and news sites: third-party cookies left 63 with blocking off, 8 before, 1 now: only the CAPTCHA cookie). Your own sign-ins stay; Google, Microsoft and Apple sign-in, CAPTCHA and payment sites are allowed. Analytics ID cookies (_ga, _fbp and similar) are deleted when the browser closes. In Max mode the Google One Tap prompt and its "are you signed in?" checks are refused; the normal Sign in with Google button still works. Setting: Privacy > "Remove other sites' cookies" (on). Not covered: the site's own server-side tracking, your IP address.
+
+## 3.9.10 filter rules, private links, back and forward
+Filter rules for ads that live on a site's own server (first-party ad frames, interstitials, "disable your ad blocker" walls and the scripts that detect an ad blocker), in Max mode only. Libra Browser ships its own short reviewed list and reads an optional list file of your own (Settings > Privacy > "Your own filter list", common Adblock format). Right-click a link > "Open link in private window": the open private window gets a new tab instead of a second window. Back and Forward are dimmed when there is nowhere to go. Not covered: pop-up, redirect and procedural rules.

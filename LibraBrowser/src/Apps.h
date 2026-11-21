@@ -25,3 +25,7 @@ inline HWND AppFindHost() {
         if (GetPropW(w, L"lbdir") == AppDirTag() && GetPropW(w, L"lbport")) return w;
     return nullptr;
 }
+inline HWND AppFindPrivate() {   // the open private window, if any (links meant for a private window go there instead of starting another one)
+    for (HWND w = nullptr; (w = FindWindowExW(nullptr, w, L"LibraBrowserWndP", nullptr)) != nullptr;) if (GetPropW(w, L"lbdir") == AppDirTag()) return w;
+    return nullptr;
+}
